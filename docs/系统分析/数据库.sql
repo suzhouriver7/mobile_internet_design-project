@@ -3,6 +3,25 @@ create schema `internet-project`;
 use `internet-project`;
 
 
+
+
+-- ===========================
+-- 1. 按外键依赖顺序删除旧表
+-- ===========================
+DROP TABLE IF EXISTS content_likes;
+DROP TABLE IF EXISTS content_media;
+DROP TABLE IF EXISTS content_nodes;
+DROP TABLE IF EXISTS order_accept;
+DROP TABLE IF EXISTS order_messages;
+DROP TABLE IF EXISTS order_apply;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS users;
+
+
+-- ===========================
+-- 2. 重新创建所有表
+-- ===========================
+
 -- 用户表
 CREATE TABLE users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户唯一编号',
