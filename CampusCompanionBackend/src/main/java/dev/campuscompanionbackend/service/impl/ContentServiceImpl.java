@@ -287,6 +287,42 @@ public class ContentServiceImpl implements ContentService {
         return likeList;
     }
 
+    @Override
+    public Object searchByKeyword(String keyword, Integer page, Integer size, Integer type) {
+        PostType postType;
+        if (type != null && type == 1) {
+            postType = PostType.COMMENT;
+        } else {
+            postType = PostType.POST;
+        }
+
+        List<Post> posts;
+        if (keyword == null || keyword.trim().isEmpty()) {
+            posts = postRepository.findByTypeAndStatusOrderByCreatedAtDesc(postType, ContentStatus.NORMAL);
+        } else {
+            posts = postRepository.findByContentContainingAndTypeAndStatusOrderByCreatedAtDesc(keyword.trim(), postType, ContentStatus.NORMAL);
+        }
+
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, posts.size());
+
+        List<Post> pagedPosts = new ArrayList<>();
+        for (int i = start; i < end && i < posts.size(); i++) {
+            pagedPosts.add(posts.get(i));
+        }
+
+        List<Map<String, Object>> contentList = pagedPosts.stream()
+                .map(this::convertToContentVO)
+                .collect(Collectors.toList());
+
+        return new PageResponse<>(
+                contentList,
+                (long) posts.size(),
+                page,
+                size
+        );
+    }
+
     private Post getPostById(Long postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(1006, "动态不存在"));

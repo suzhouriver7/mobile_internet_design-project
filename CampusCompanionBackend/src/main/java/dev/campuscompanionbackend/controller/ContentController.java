@@ -137,4 +137,22 @@ public class ContentController extends BaseController {
         Object result = contentService.getLikes(contentId);
         return success(result);
     }
+
+    /**
+     * 关键词查询
+     * @param keyword 查询关键词
+     * @param page 页码，默认1
+     * @param size 每页数量，默认10
+     * @param type 内容类型
+     * @return ApiResponse<Object>
+     */
+    @GetMapping("/search")
+    public ApiResponse<Object> searchByKeyword(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) Integer type) {
+        Object result = contentService.searchByKeyword(keyword, page, size, type);
+        return success(result);
+    }
 }

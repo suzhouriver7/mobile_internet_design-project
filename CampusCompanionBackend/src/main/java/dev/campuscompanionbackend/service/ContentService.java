@@ -76,4 +76,14 @@ public interface ContentService {
      * @return Object 点赞用户列表
      */
     Object getLikes(Long contentId);
+
+    /**
+     * 根据关键字查询动态列表
+     * @param keyword 关键词
+     * @param page 页码
+     * @param size 每页数量
+     * @param type 内容类型
+     * @return Object 动态列表
+     */
+    Object searchByKeyword(String keyword, Integer page, Integer size, Integer type);
 }
