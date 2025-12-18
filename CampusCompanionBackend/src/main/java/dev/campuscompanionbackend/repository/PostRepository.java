@@ -46,11 +46,21 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     List<Post> findByOrderAndStatus(Order order, ContentStatus status);
 
     /**
-     * F查询所有正常状态的动态，按创建时间降序
+     * 查询所有正常状态的动态，按创建时间降序
      *
      * @param type   the type
      * @param status the status
      * @return the list
      */
     List<Post> findByTypeAndStatusOrderByCreatedAtDesc(PostType type, ContentStatus status);
+
+    /**
+     * 按照关键词查询所有正常状态的动态，按照创建时间降序
+     *
+     * @param keyword the keyword
+     * @param type    the type
+     * @param status  the status
+     * @return the list
+     */
+    List<Post> findByContentContainingAndTypeAndStatusOrderByCreatedAtDesc(String keyword, PostType type, ContentStatus status);
 }
