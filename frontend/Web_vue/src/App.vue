@@ -6,6 +6,7 @@
         <div class="logo">
           <router-link to="/" class="logo-text">校园 companion</router-link>
         </div>
+        <!-- 桌面端导航菜单 -->
         <el-menu 
           :default-active="activeIndex" 
           class="nav-menu" 
@@ -25,6 +26,22 @@
             <router-link to="/ai">AI问询</router-link>
           </el-menu-item>
         </el-menu>
+        <!-- 移动端下拉菜单 -->
+        <div class="mobile-nav">
+          <el-dropdown>
+            <span class="el-dropdown-link">
+              <el-icon><MenuIcon /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="navigate('/')">首页</el-dropdown-item>
+                <el-dropdown-item @click="navigate('/orders')">订单</el-dropdown-item>
+                <el-dropdown-item @click="navigate('/contents')">动态</el-dropdown-item>
+                <el-dropdown-item @click="navigate('/ai')">AI问询</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
         <div class="user-info">
           <el-dropdown v-if="isAuthenticated">
             <span class="el-dropdown-link">
@@ -69,7 +86,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Menu as MenuIcon } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -91,6 +108,11 @@ const userInfo = computed(() => authStore.user || { nickname: '用户' })
 // 处理菜单选择
 const handleSelect = (key, keyPath) => {
   console.log('Selected:', key, keyPath)
+}
+
+// 移动端菜单导航
+const navigate = (path) => {
+  router.push(path)
 }
 
 // 处理退出登录
@@ -199,6 +221,11 @@ body {
       }
     }
   }
+
+  .mobile-nav {
+    display: none;
+    margin-left: 16px;
+  }
   
   .user-info {
     display: flex;
@@ -299,6 +326,10 @@ body {
     
     .nav-menu {
       display: none;
+    }
+
+    .mobile-nav {
+      display: block;
     }
     
     .user-info {
