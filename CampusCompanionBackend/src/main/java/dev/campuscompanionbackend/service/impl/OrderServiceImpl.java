@@ -73,16 +73,10 @@ public class OrderServiceImpl implements OrderService {
                 page, size, status, activityType, campus);
 
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Order> orderPage;
 
-        if (status != null && activityType != null && campus != null) {
-            List<Order> filteredOrders = orderRepository.findByCampusAndActivityTypeAndStatus(campus, activityType, status);
-            return manualPagination(filteredOrders, page, size);
-        } else if (status != null) {
-            List<Order> filteredOrders = orderRepository.findByStatus(status);
-            return manualPagination(filteredOrders, page, size);
-        } else {
-            orderPage = orderRepository.findAll(pageable);
+        // 如果没有任何筛选条件，直接使用分页查询
+        if (status == null && activityType == null && campus == null) {
+            Page<Order> orderPage = orderRepository.findAll(pageable);
 
             List<Map<String, Object>> orderList = orderPage.getContent().stream()
                     .map(this::convertToOrderVO)
@@ -95,6 +89,27 @@ public class OrderServiceImpl implements OrderService {
                     size
             );
         }
+
+        // 其余情况统一走内存筛选，支持任意条件组合
+        List<Order> baseList;
+        if (status != null && activityType != null && campus != null) {
+            // 三个条件都有时优先走已有的组合查询
+            baseList = orderRepository.findByCampusAndActivityTypeAndStatus(campus, activityType, status);
+        } else if (status != null) {
+            // 只有状态时可以复用按状态查询
+            baseList = orderRepository.findByStatus(status);
+        } else {
+            // 其它组合场景先按创建时间倒序查出全部，再在内存中过滤
+            baseList = orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+        }
+
+        List<Order> filtered = baseList.stream()
+                .filter(o -> status == null || o.getStatus() == status)
+                .filter(o -> activityType == null || o.getActivityType() == activityType)
+                .filter(o -> campus == null || o.getCampus() == campus)
+                .collect(Collectors.toList());
+
+        return manualPagination(filtered, page, size);
     }
 
     private Object manualPagination(List<Order> orders, Integer page, Integer size) {
