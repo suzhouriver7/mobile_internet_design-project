@@ -75,7 +75,11 @@
         <el-table-column label="发布者" min-width="120">
           <template #default="scope">
             <div class="user-info">
-              <el-avatar :src="scope.row.user.avatarUrl" size="small" />
+              <el-avatar :src="scope.row.user.avatarUrl" size="small">
+                <span v-if="!scope.row.user.avatarUrl">
+                  {{ (scope.row.user.nickname || '用').slice(0, 1) }}
+                </span>
+              </el-avatar>
               <span>{{ scope.row.user.nickname }}</span>
             </div>
           </template>
@@ -214,6 +218,14 @@ const getStatusType = (status) => {
   return statusTypeMap[status] || 'info'
 }
 
+// 与用户 store 保持一致，将后端返回的相对头像路径转换为完整 URL
+const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+const resolveAvatarUrl = (url) => {
+  if (!url) return url
+  if (/^https?:\/\//.test(url)) return url
+  return `${fileBaseUrl}${url}`
+}
+
 const applyLocalFilter = (list) => {
   return list.filter((item) => {
     if (searchForm.activityType && item.activityType !== searchForm.activityType) {
@@ -295,6 +307,14 @@ const fetchOrders = async () => {
     // 后端返回 ApiResponse<Object>，其中 data 为分页结果
     const serverData = response.data?.data || {}
     let list = serverData.list || []
+
+    // 解析用户头像 URL（如果有）
+    list = list.map((item) => {
+      if (item.user && item.user.avatarUrl) {
+        item.user.avatarUrl = resolveAvatarUrl(item.user.avatarUrl)
+      }
+      return item
+    })
 
     const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status)
     if (hasFilter) {
