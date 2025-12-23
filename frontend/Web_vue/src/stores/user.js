@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
 import axios from '../utils/axios'
 
+// 将后端返回的头像相对路径（如 /uploads/xxx.png）转换为可在前端直接访问的完整 URL
+const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+
+const resolveAvatarUrl = (url) => {
+  if (!url) return url
+  // 已经是完整 URL 则直接返回
+  if (/^https?:\/\//.test(url)) return url
+  return `${fileBaseUrl}${url}`
+}
+
 export const useUserStore = defineStore('user', {
   state: () => ({
     currentUser: null,
@@ -13,12 +23,22 @@ export const useUserStore = defineStore('user', {
     async fetchCurrentUser() {
       try {
         this.loading = true
-        const response = await axios.get('/users/current')
+        const storedId = localStorage.getItem('userId')
+        if (!storedId) {
+          this.loading = false
+          return null
+        }
+
+        const response = await axios.get(`/users/${storedId}`)
+        // 后端统一响应：{ code, message, data, timestamp }
         this.currentUser = response.data.data
+        if (this.currentUser && this.currentUser.avatarUrl) {
+          this.currentUser.avatarUrl = resolveAvatarUrl(this.currentUser.avatarUrl)
+        }
         return response.data
       } catch (error) {
-        this.error = error.response.data.message
-        throw error.response.data
+        this.error = error.response?.data?.message || '获取用户信息失败'
+        throw error.response?.data || error
       } finally {
         this.loading = false
       }
@@ -27,12 +47,20 @@ export const useUserStore = defineStore('user', {
     async updateUser(userData) {
       try {
         this.loading = true
-        const response = await axios.put('/users/current', userData)
+        const storedId = localStorage.getItem('userId')
+        if (!storedId) {
+          throw new Error('未找到用户ID，请重新登录')
+        }
+
+        const response = await axios.put(`/users/${storedId}`, userData)
         this.currentUser = response.data.data
+        if (this.currentUser && this.currentUser.avatarUrl) {
+          this.currentUser.avatarUrl = resolveAvatarUrl(this.currentUser.avatarUrl)
+        }
         return response.data
       } catch (error) {
-        this.error = error.response.data.message
-        throw error.response.data
+        this.error = error.response?.data?.message || '更新用户信息失败'
+        throw error.response?.data || error
       } finally {
         this.loading = false
       }
@@ -41,29 +69,47 @@ export const useUserStore = defineStore('user', {
     async updatePassword(passwordData) {
       try {
         this.loading = true
-        const response = await axios.put('/users/password', passwordData)
+        const storedId = localStorage.getItem('userId')
+        if (!storedId) {
+          throw new Error('未找到用户ID，请重新登录')
+        }
+
+        const response = await axios.put(`/users/${storedId}/password`, passwordData)
         return response.data
       } catch (error) {
-        this.error = error.response.data.message
-        throw error.response.data
+        this.error = error.response?.data?.message || '修改密码失败'
+        throw error.response?.data || error
       } finally {
         this.loading = false
       }
     },
 
-    async uploadAvatar(formData) {
+    async uploadAvatar(file) {
       try {
         this.loading = true
-        const response = await axios.post('/upload/avatar', formData, {
+        const storedId = localStorage.getItem('userId')
+        if (!storedId) {
+          throw new Error('未找到用户ID，请重新登录')
+        }
+
+        const formData = new FormData()
+        formData.append('avatar', file)
+
+        const response = await axios.post(`/users/${storedId}/avatar`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         })
-        this.currentUser.avatar = response.data.data.url
+        const avatarUrl = resolveAvatarUrl(response.data.data)
+        if (!this.currentUser) {
+          this.currentUser = { avatarUrl }
+        } else {
+          this.currentUser.avatarUrl = avatarUrl
+        }
         return response.data
       } catch (error) {
-        this.error = error.response.data.message
-        throw error.response.data
+        this.error = error.response?.data?.message || '头像上传失败'
+        throw error.response?.data || error
       } finally {
         this.loading = false
       }
