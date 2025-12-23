@@ -45,7 +45,7 @@
         <div class="user-info">
           <el-dropdown v-if="isAuthenticated">
             <span class="el-dropdown-link">
-              {{ userInfo.nickname }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              {{ (userInfo && userInfo.nickname) || '用户' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -103,7 +103,8 @@ const activeIndex = computed(() => {
 
 // 计算用户认证状态
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-const userInfo = computed(() => authStore.user || { nickname: '用户' })
+// 直接返回 store 中的用户对象，便于判断是否需要拉取用户信息
+const userInfo = computed(() => authStore.user)
 
 // 处理菜单选择
 const handleSelect = (key, keyPath) => {

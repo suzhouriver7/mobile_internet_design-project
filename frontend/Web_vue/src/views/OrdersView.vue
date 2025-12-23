@@ -10,7 +10,14 @@
       
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="活动类型">
-          <el-select v-model="searchForm.activityType" placeholder="请选择">
+          <el-select
+            v-model="searchForm.activityType"
+            placeholder="请选择"
+            clearable
+            :disabled="loading"
+            class="filter-select"
+          >
+              <el-option label="不限" :value="''" />
               <el-option label="篮球" value="BASKETBALL" />
               <el-option label="羽毛球" value="BADMINTON" />
               <el-option label="吃饭" value="MEAL" />
@@ -22,7 +29,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="校区">
-          <el-select v-model="searchForm.campus" placeholder="请选择">
+          <el-select
+            v-model="searchForm.campus"
+            placeholder="请选择"
+            clearable
+            :disabled="loading"
+            class="filter-select"
+          >
+              <el-option label="不限" :value="''" />
               <el-option label="良乡校区" value="LIANGXIANG" />
               <el-option label="中关村校区" value="ZHONGGUANCUN" />
               <el-option label="珠海校区" value="ZHUHAI" />
@@ -31,7 +45,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择">
+          <el-select
+            v-model="searchForm.status"
+            placeholder="请选择"
+            clearable
+            :disabled="loading"
+            class="filter-select"
+          >
+              <el-option label="不限" :value="''" />
               <el-option label="待匹配" value="PENDING" />
               <el-option label="进行中" value="IN_PROGRESS" />
               <el-option label="已完成" value="COMPLETED" />
@@ -40,13 +61,17 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="resetForm">重置</el-button>
+          <el-button type="primary" @click="handleSearch" :loading="loading">查询</el-button>
+          <el-button @click="resetForm" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
-      
-      <el-table v-loading="loading" :data="ordersList" style="width: 100%">
-        <el-table-column prop="id" label="订单ID" width="80" />
+
+      <el-table
+        v-if="ordersList.length > 0"
+        v-loading="loading"
+        :data="ordersList"
+        style="width: 100%"
+      >
         <el-table-column label="发布者" min-width="120">
           <template #default="scope">
             <div class="user-info">
@@ -91,6 +116,11 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-empty
+        v-else-if="!loading"
+        description="没有找到符合条件的订单，试试调整筛选条件吧"
+      />
       
       <div class="pagination">
         <el-pagination
@@ -108,12 +138,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useOrderStore } from '../stores/order'
 
 const router = useRouter()
+const route = useRoute()
 const orderStore = useOrderStore()
 
 const loading = ref(false)
@@ -183,6 +214,73 @@ const getStatusType = (status) => {
   return statusTypeMap[status] || 'info'
 }
 
+const applyLocalFilter = (list) => {
+  return list.filter((item) => {
+    if (searchForm.activityType && item.activityType !== searchForm.activityType) {
+      return false
+    }
+    if (searchForm.campus && item.campus !== searchForm.campus) {
+      return false
+    }
+    if (searchForm.status && item.status !== searchForm.status) {
+      return false
+    }
+    return true
+  })
+}
+
+const buildQueryFromState = () => {
+  const query = {
+    page: currentPage.value,
+    size: pageSize.value
+  }
+
+  if (searchForm.activityType) {
+    query.activityType = searchForm.activityType
+  }
+  if (searchForm.campus) {
+    query.campus = searchForm.campus
+  }
+  if (searchForm.status) {
+    query.status = searchForm.status
+  }
+
+  return query
+}
+
+const applyStateFromRoute = () => {
+  const q = route.query
+
+  if (q.page) {
+    const pageNum = Number(q.page)
+    if (!Number.isNaN(pageNum) && pageNum > 0) {
+      currentPage.value = pageNum
+    }
+  }
+
+  if (q.size) {
+    const sizeNum = Number(q.size)
+    if (!Number.isNaN(sizeNum) && sizeNum > 0) {
+      pageSize.value = sizeNum
+    }
+  }
+
+  if (typeof q.activityType === 'string') {
+    searchForm.activityType = q.activityType
+  }
+  if (typeof q.campus === 'string') {
+    searchForm.campus = q.campus
+  }
+  if (typeof q.status === 'string') {
+    searchForm.status = q.status
+  }
+}
+
+const syncRouteWithState = () => {
+  const query = buildQueryFromState()
+  router.replace({ path: route.path, query })
+}
+
 const fetchOrders = async () => {
   loading.value = true
   try {
@@ -195,8 +293,16 @@ const fetchOrders = async () => {
     }
     const response = await orderStore.getOrders(params)
     // 后端返回 ApiResponse<Object>，其中 data 为分页结果
-    ordersList.value = response.data.data.list
-    total.value = response.data.data.total
+    const serverData = response.data?.data || {}
+    let list = serverData.list || []
+
+    const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status)
+    if (hasFilter) {
+      list = applyLocalFilter(list)
+    }
+
+    ordersList.value = list
+    total.value = hasFilter ? list.length : serverData.total
   } catch (error) {
     ElMessage.error(error.message || '获取订单列表失败')
   } finally {
@@ -206,6 +312,7 @@ const fetchOrders = async () => {
 
 const handleSearch = () => {
   currentPage.value = 1
+  syncRouteWithState()
   fetchOrders()
 }
 
@@ -214,12 +321,14 @@ const resetForm = () => {
     searchForm[key] = ''
   })
   currentPage.value = 1
+  syncRouteWithState()
   fetchOrders()
 }
 
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
+  syncRouteWithState()
   fetchOrders()
 }
 
@@ -247,6 +356,8 @@ const handleApplyOrder = async (orderId) => {
 }
 
 onMounted(() => {
+  applyStateFromRoute()
+  syncRouteWithState()
   fetchOrders()
 })
 </script>
@@ -264,6 +375,10 @@ onMounted(() => {
 
 .search-form {
   margin-bottom: 20px;
+}
+
+.filter-select {
+  width: 130px;
 }
 
 .user-info {
