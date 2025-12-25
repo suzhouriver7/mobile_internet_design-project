@@ -1,8 +1,9 @@
 package dev.campuscompanionbackend.controller;
 
 import dev.campuscompanionbackend.dto.response.ApiResponse;
+import dev.campuscompanionbackend.exception.UserExistException;
 import dev.campuscompanionbackend.service.VerifyService;
-import dev.campuscompanionbackend.service.exception.EmailVerifyException;
+import dev.campuscompanionbackend.exception.EmailInvalidException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,12 +22,8 @@ public class VerifyController extends BaseController{
     }
 
     @PostMapping("/email/{email}")
-    public ApiResponse<Void> verifyEmail(@PathVariable String email) {
-        try{
-            verifyService.verifyEmail(email);
-        }catch (EmailVerifyException e){
-            return ApiResponse.error(String.format("无法向 %s 发送验证码", email));
-        }
+    public ApiResponse<Void> verifyEmail(@PathVariable String email) throws EmailInvalidException, UserExistException {
+        verifyService.verifyEmail(email);
         return ApiResponse.success(String.format("已向 %s 发送验证码", email), null);
     }
 }

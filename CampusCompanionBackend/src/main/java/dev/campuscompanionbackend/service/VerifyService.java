@@ -1,7 +1,8 @@
 package dev.campuscompanionbackend.service;
 
 
-import dev.campuscompanionbackend.service.exception.EmailVerifyException;
+import dev.campuscompanionbackend.exception.EmailInvalidException;
+import dev.campuscompanionbackend.exception.UserExistException;
 
 public interface VerifyService {
 
@@ -9,7 +10,7 @@ public interface VerifyService {
      * 验证邮箱
      *
      * @param email the email
-     * @throws EmailVerifyException the email verify exception
+     * @throws EmailInvalidException the email verify exception
      */
-    void verifyEmail(String email) throws EmailVerifyException;
+    void verifyEmail(String email) throws EmailInvalidException, UserExistException;
 }
