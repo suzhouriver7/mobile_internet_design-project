@@ -24,6 +24,12 @@ instance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
+     // 透传当前登录用户 ID，后端用它识别当前用户身份
+     const userId = localStorage.getItem('userId')
+     if (userId) {
+       config.headers['X-User-Id'] = userId
+     }
+
     const fullUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url
 
     // 记录请求日志（不包含敏感信息）

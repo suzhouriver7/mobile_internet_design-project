@@ -19,6 +19,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,12 +41,33 @@ public class OrderServiceImpl implements OrderService {
 
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /**
+     * 从当前 HTTP 请求头中解析出登录用户 ID。
+     * 前端在 axios 拦截器中会把 localStorage.userId 放到 X-User-Id 头里。
+     */
+    private Long getCurrentUserIdOrThrow() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttributes)) {
+            throw new BusinessException(1001, "无法获取当前用户信息");
+        }
+
+        String userIdHeader = servletAttributes.getRequest().getHeader("X-User-Id");
+        if (userIdHeader == null || userIdHeader.isBlank()) {
+            throw new BusinessException(1001, "未登录或用户信息缺失");
+        }
+
+        try {
+            return Long.parseLong(userIdHeader);
+        } catch (NumberFormatException e) {
+            throw new BusinessException(1001, "用户信息格式错误");
+        }
+    }
+
     @Override
     @Transactional
     public Long createOrder(CreateOrderRequest request) {
         log.info("发布预约订单: activityType={}, campus={}", request.getActivityType(), request.getCampus());
-
-        Long currentUserId = 1L;
+        Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
 
         LocalDateTime startTime = LocalDateTime.parse(request.getStartTime(), formatter);
@@ -197,7 +221,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = getOrderById(orderId);
 
-        Long currentUserId = 1L;
+        Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
             throw new BusinessException(1004, "只有订单发布者可以删除订单");
         }
@@ -238,7 +262,7 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(1009, "人数已满");
         }
 
-        Long currentUserId = 2L;
+        Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
 
         if (orderApplyRepository.existsByOrderAndUser(order, currentUser)) {
@@ -261,7 +285,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = getOrderById(orderId);
 
-        Long currentUserId = 2L;
+        Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
 
         OrderApply orderApply = orderApplyRepository.findByOrderAndUser(order, currentUser)
@@ -293,7 +317,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = orderApply.getOrder();
 
-        Long currentUserId = 1L;
+        Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
             throw new BusinessException(1004, "只有订单发布者可以审核申请");
         }
@@ -340,11 +364,11 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = getOrderById(orderId);
 
-        Long senderId = 2L;
-        Long receiverId = 1L;
-
+        Long senderId = getCurrentUserIdOrThrow();
         User sender = getUserById(senderId);
-        User receiver = getUserById(receiverId);
+
+        // 简化处理：将消息发送给订单发布者
+        User receiver = order.getUser();
 
         OrderMessage orderMessage = new OrderMessage();
         orderMessage.setOrder(order);
