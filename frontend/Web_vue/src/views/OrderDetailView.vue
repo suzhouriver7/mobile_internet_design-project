@@ -149,7 +149,37 @@
                 <div class="apply-meta">
                   <div class="apply-name-row">
                     <span class="apply-name">{{ apply.user?.nickname || '未知用户' }}</span>
-                    <el-tag size="small" type="info">{{ getApplyStatusLabel(apply.status) }}</el-tag>
+                    <div class="apply-actions">
+                      <el-tag size="small" type="info">{{ getApplyStatusLabel(apply.status) }}</el-tag>
+                      <!-- 发布者审核操作：仅对待审核的申请显示 -->
+                      <template v-if="canAuditApply(apply)">
+                        <el-button
+                          type="success"
+                          text
+                          size="small"
+                          @click.stop="handleAudit(apply, 'APPROVED')"
+                        >
+                          通过
+                        </el-button>
+                        <el-button
+                          type="danger"
+                          text
+                          size="small"
+                          @click.stop="handleAudit(apply, 'REJECTED')"
+                        >
+                          拒绝
+                        </el-button>
+                      </template>
+                      <el-button
+                        v-if="canCancelApply(apply)"
+                        type="danger"
+                        text
+                        size="small"
+                        @click.stop="handleCancelApply(apply)"
+                      >
+                        撤销申请
+                      </el-button>
+                    </div>
                   </div>
                   <div class="apply-time">
                     申请时间：{{ formatDateTime(apply.createdAt, false) }}
@@ -170,13 +200,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { useOrderStore } from '../stores/order'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const orderStore = useOrderStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 
@@ -222,11 +254,12 @@ const genderMap = {
   ANY: '不限'
 }
 
+// 与后端 ApplyStatus 枚举保持一致
 const applyStatusMap = {
-  PENDING: '待审核',
+  PENDING_REVIEW: '待审核',
   APPROVED: '已通过',
   REJECTED: '已拒绝',
-  CANCELLED: '已取消'
+  CANCELLED_APPLY: '已取消'
 }
 
 // 静态资源基地址，与用户头像逻辑保持一致
@@ -240,7 +273,15 @@ const resolveAvatarUrl = (url) => {
 const detail = computed(() => orderStore.currentOrder)
 const order = computed(() => detail.value?.order || null)
 const publisher = computed(() => order.value?.user || null)
-const applications = computed(() => detail.value?.applications || [])
+// 原始申请列表
+const rawApplications = computed(() => detail.value?.applications || [])
+// 过滤掉已撤销的申请，只展示有效记录
+const applications = computed(() => rawApplications.value.filter(a => a.status !== 'CANCELLED_APPLY'))
+
+// 当前登录用户 ID
+const currentUserId = computed(() => {
+  return authStore.user?.id || Number(localStorage.getItem('userId')) || null
+})
 
 const publisherAvatarUrl = computed(() => {
   if (!publisher.value?.avatarUrl) return ''
@@ -293,6 +334,37 @@ const getUserInitial = (user) => {
   return '用'
 }
 
+// 是否为当前订单的发布者
+const isPublisher = computed(() => {
+  if (!currentUserId.value || !order.value?.user) return false
+  return order.value.user.id === currentUserId.value
+})
+
+// 判断某条申请是否属于当前登录用户
+const isMyApplication = (apply) => {
+  if (!currentUserId.value || !apply?.user) return false
+  return apply.user.id === currentUserId.value
+}
+
+// 仅待审核状态允许撤销
+const isPendingApply = (apply) => {
+  if (!apply?.status) return false
+  return apply.status === 'PENDING_REVIEW'
+}
+
+// 是否可以显示“撤销申请”按钮
+const canCancelApply = (apply) => {
+  return isMyApplication(apply) && isPendingApply(apply) && order.value?.status === 'PENDING'
+}
+
+// 发布者是否可以对该申请进行审核
+const canAuditApply = (apply) => {
+  // 仅订单发布者、订单处于待匹配、且该申请为待审核状态时允许
+  if (!isPublisher.value) return false
+  if (!order.value || order.value.status !== 'PENDING') return false
+  return isPendingApply(apply)
+}
+
 const normalizeDetail = () => {
   const d = orderStore.currentOrder
   if (!d) return
@@ -329,6 +401,76 @@ const loadDetail = async () => {
     ElMessage.error(error?.message || '加载订单详情失败')
   } finally {
     loading.value = false
+  }
+}
+
+const handleCancelApply = async (apply) => {
+  if (!order.value?.id || !apply?.id) return
+  if (!canCancelApply(apply)) return
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要撤销该申请吗？',
+      '撤销申请确认',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning',
+        draggable: true
+      }
+    )
+
+    await orderStore.cancelApply(order.value.id)
+    // 本地更新并移除该条申请，避免整页刷新
+    const d = orderStore.currentOrder
+    if (d && Array.isArray(d.applications)) {
+      d.applications = d.applications
+        .map(a => {
+          if (a.id === apply.id) {
+            return { ...a, status: 'CANCELLED_APPLY' }
+          }
+          return a
+        })
+        .filter(a => a.status !== 'CANCELLED_APPLY')
+    }
+
+    ElMessage.success('已撤销申请')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(error?.message || '撤销申请失败')
+  }
+}
+
+// 发布者审核申请：通过或拒绝
+const handleAudit = async (apply, targetStatus) => {
+  if (!apply?.id || !order.value?.id) return
+  if (!canAuditApply(apply)) return
+
+  const actionText = targetStatus === 'APPROVED' ? '通过' : '拒绝'
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要${actionText}该申请吗？`,
+      '审核确认',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning',
+        draggable: true
+      }
+    )
+
+    await orderStore.auditApplication(apply.id, targetStatus)
+    // 审核成功后重新加载详情，以便人数和申请状态保持与后端一致
+    await loadDetail()
+    ElMessage.success(`已${actionText}申请`)
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    ElMessage.error(error?.message || `${actionText}申请失败`)
   }
 }
 
@@ -542,6 +684,12 @@ onMounted(() => {
 .apply-name {
   font-size: 14px;
   font-weight: 500;
+}
+
+.apply-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .apply-time {

@@ -265,6 +265,8 @@ const isApplyDisabled = (order) => {
   // 非发布者：已申请、非待匹配状态都不允许再申请
   if (hasApplied(order)) return true
   if (order.status !== 'PENDING') return true
+  // 人数已满时不允许继续申请
+  if (order.currentPeople >= order.maxPeople) return true
   return false
 }
 
@@ -280,6 +282,7 @@ const getApplyButtonText = (order) => {
 
   if (hasApplied(order)) return '已申请'
   if (order.status !== 'PENDING') return '不可申请'
+  if (order.currentPeople >= order.maxPeople) return '人数已满'
   return '申请'
 }
 
@@ -294,7 +297,12 @@ const loadAppliedInfoForOrders = async (list) => {
       try {
         const res = await orderStore.getApplications(item.id)
         const apps = res.data?.data || []
-        const applied = apps.some(app => app.user && app.user.id === userId)
+          // 只把仍然有效、未撤销的申请视为“已申请”
+          const applied = apps.some(app => {
+            if (!app.user || app.user.id !== userId) return false
+            // 后端取消申请后状态为 CANCELLED_APPLY，不再算作已申请
+            return app.status !== 'CANCELLED_APPLY'
+          })
         if (applied) {
           appliedOrderMap.value[item.id] = true
         }
