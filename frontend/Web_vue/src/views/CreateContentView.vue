@@ -157,6 +157,9 @@ const isImage = (file) => {
   return type.startsWith('image/')
 }
 
+// 简单的前端体积校验，避免明显超过后端限制的文件
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
+
 const inferMediaType = () => {
   if (!fileList.value.length) return 0 // TEXT
   const hasVideo = fileList.value.some((f) => {
@@ -167,6 +170,14 @@ const inferMediaType = () => {
 }
 
 const handleFileChange = (file, files) => {
+  // 超出大小限制的文件直接提示并过滤掉
+  const raw = file.raw || file
+  if (raw && raw.size && raw.size > MAX_FILE_SIZE) {
+    ElMessage.warning('单个文件不能超过 20MB')
+    // 从列表中移除当前文件
+    fileList.value = files.filter((f) => f.uid !== file.uid)
+    return
+  }
   // el-upload 在未上传模式下不会自动赋 url，这里做个简单处理方便预览
   if (!file.url && file.raw) {
     file.rawUrl = URL.createObjectURL(file.raw)
@@ -243,10 +254,20 @@ const handlePublish = async () => {
       mediaType
     })
 
-    // 兼容不同后端返回结构：优先从 data.contentId / data.id 读取
+    // 兼容当前后端 ApiResponse<Long> 结构：
+    // - 正常情况下 data 字段就是一个 Long 类型的内容 ID
+    // - 若未来改成对象，则优先从 data.contentId / data.id 读取
     const respBody = createResp?.data || {}
-    const respData = respBody.data || respBody
-    const contentId = respData.contentId ?? respData.id
+    const rawData = respBody.data
+    let contentId = null
+
+    if (rawData != null) {
+      if (typeof rawData === 'number' || typeof rawData === 'string') {
+        contentId = Number(rawData)
+      } else if (typeof rawData === 'object') {
+        contentId = rawData.contentId ?? rawData.id ?? null
+      }
+    }
 
     // 2. 若有文件且拿到了内容 ID，依次上传到 /contents/{contentId}/media
     if (fileList.value.length && contentId) {

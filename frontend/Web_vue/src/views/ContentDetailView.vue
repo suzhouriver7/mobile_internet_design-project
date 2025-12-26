@@ -26,7 +26,7 @@
           <p class="text">{{ content.content }}</p>
 
           <div
-            v-if="content.mediaType === 1 && content.mediaUrls && content.mediaUrls.length"
+              v-if="isImageType(content.mediaType) && content.mediaUrls && content.mediaUrls.length"
             class="media-grid"
           >
             <el-image
@@ -41,7 +41,7 @@
           </div>
 
           <div
-            v-if="content.mediaType === 2 && content.mediaUrls && content.mediaUrls.length"
+              v-if="isVideoType(content.mediaType) && content.mediaUrls && content.mediaUrls.length"
             class="media-video"
           >
             <video
@@ -168,6 +168,10 @@ const formatTime = (time) => {
   const date = new Date(time)
   return date.toLocaleString()
 }
+
+// 兼容后端返回的媒体类型：既可能是数字 1/2，也可能是字符串 'IMAGE'/'VIDEO'
+const isImageType = (mediaType) => mediaType === 1 || mediaType === 'IMAGE'
+const isVideoType = (mediaType) => mediaType === 2 || mediaType === 'VIDEO'
 
 const fetchDetail = async () => {
   loading.value = true

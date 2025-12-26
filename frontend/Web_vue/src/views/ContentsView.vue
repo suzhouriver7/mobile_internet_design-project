@@ -58,7 +58,7 @@
             <p class="text">{{ item.content }}</p>
 
             <div
-              v-if="item.mediaType === 1 && item.mediaUrls && item.mediaUrls.length"
+              v-if="isImageType(item.mediaType) && item.mediaUrls && item.mediaUrls.length"
               class="media-grid"
             >
               <el-image
@@ -73,7 +73,7 @@
             </div>
 
             <div
-              v-if="item.mediaType === 2 && item.mediaUrls && item.mediaUrls.length"
+              v-if="isVideoType(item.mediaType) && item.mediaUrls && item.mediaUrls.length"
               class="media-video"
             >
               <video
@@ -159,6 +159,10 @@ const resolveMediaUrl = (url) => {
   if (/^https?:\/\//.test(url)) return url
   return `${fileBaseUrl}${url}`
 }
+
+// 兼容后端返回的媒体类型：既可能是数字 1/2，也可能是字符串 'IMAGE'/'VIDEO'
+const isImageType = (mediaType) => mediaType === 1 || mediaType === 'IMAGE'
+const isVideoType = (mediaType) => mediaType === 2 || mediaType === 'VIDEO'
 
 const resolveAvatarUrl = (url) => {
   if (!url) return url

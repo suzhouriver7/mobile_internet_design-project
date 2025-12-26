@@ -36,6 +36,7 @@ public class ContentServiceImpl implements ContentService {
     private final PostLikeRepository postLikeRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    private final PostMediaRepository postMediaRepository;
 
     /**
      * 从当前 HTTP 请求头中解析出登录用户 ID。
@@ -221,6 +222,13 @@ public class ContentServiceImpl implements ContentService {
             post.setHasMedia(mediaType);
             post.setUpdatedAt(LocalDateTime.now());
             postRepository.save(post);
+
+            // 记录媒体信息，便于后续列表/详情接口返回 mediaUrls
+            PostMedia postMedia = new PostMedia();
+            postMedia.setPost(post);
+            postMedia.setMediaType(mediaType);
+            postMedia.setUrl(mediaUrl);
+            postMediaRepository.save(postMedia);
 
             return mediaUrl;
         } catch (IOException e) {
@@ -417,10 +425,19 @@ public class ContentServiceImpl implements ContentService {
 
         List<PostLike> likes = postLikeRepository.findByPost(post);
         List<Post> comments = postRepository.findByParentPostAndTypeAndStatusOrderByCreatedAtDesc(
-                post, PostType.COMMENT, ContentStatus.NORMAL);
+            post, PostType.COMMENT, ContentStatus.NORMAL);
 
         contentVO.put("likeCount", likes.size());
         contentVO.put("commentCount", comments.size());
+
+        // 媒体资源列表
+        List<PostMedia> mediaList = postMediaRepository.findByPost(post);
+        if (mediaList != null && !mediaList.isEmpty()) {
+            List<String> mediaUrls = mediaList.stream()
+                .map(PostMedia::getUrl)
+                .collect(Collectors.toList());
+            contentVO.put("mediaUrls", mediaUrls);
+        }
 
         // 标记当前登录用户是否已点赞该内容，用于前端在刷新后还原点赞状态
         boolean liked = false;
