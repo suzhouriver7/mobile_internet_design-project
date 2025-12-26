@@ -263,22 +263,29 @@ public class ContentServiceImpl implements ContentService {
         log.info("获取评论列表: contentId={}, page={}, size={}", contentId, page, size);
 
         Post post = getPostById(contentId);
-        List<Post> comments = postRepository.findByParentPostAndTypeAndStatusOrderByCreatedAtDesc(
+        // 1. 先查出这条动态下的所有「顶层评论」（直接回复动态的评论）
+        List<Post> rootComments = postRepository.findByParentPostAndTypeAndStatusOrderByCreatedAtDesc(
                 post, PostType.COMMENT, ContentStatus.NORMAL);
 
+        // 2. 对顶层评论做分页（树形结构通常只对根节点分页，子回复全部带回）
         int start = (page - 1) * size;
-        int end = Math.min(start + size, comments.size());
+        int end = Math.min(start + size, rootComments.size());
 
-        List<Post> pagedComments = new ArrayList<>();
-        for (int i = start; i < end && i < comments.size(); i++) {
-            pagedComments.add(comments.get(i));
+        List<Post> pagedRootComments = new ArrayList<>();
+        for (int i = start; i < end && i < rootComments.size(); i++) {
+            pagedRootComments.add(rootComments.get(i));
         }
 
-        List<Map<String, Object>> commentList = buildCommentTree(pagedComments);
+        // 3. 为每条顶层评论递归查询其所有子评论，构建完整树
+        List<Map<String, Object>> commentList = new ArrayList<>();
+        for (Post root : pagedRootComments) {
+            commentList.add(buildCommentNode(root, null));
+        }
 
+        // total 统计顶层评论总数，符合前端分页语义
         return new PageResponse<>(
                 commentList,
-                (long) comments.size(),
+                (long) rootComments.size(),
                 page,
                 size
         );
@@ -450,41 +457,36 @@ public class ContentServiceImpl implements ContentService {
         return detailVO;
     }
 
-    private List<Map<String, Object>> buildCommentTree(List<Post> comments) {
-        Map<Long, Map<String, Object>> commentMap = new HashMap<>();
+    /**
+     * 递归构建评论节点及其所有子评论
+     *
+     * @param comment  当前评论实体
+     * @param parentId 父评论 ID，顶层评论为 null
+     * @return 包含 id/user/content/parentId/replies/createdAt 的评论 VO
+     */
+    private Map<String, Object> buildCommentNode(Post comment, Long parentId) {
+        Map<String, Object> commentVO = new HashMap<>();
+        commentVO.put("id", comment.getPid());
 
-        for (Post comment : comments) {
-            Map<String, Object> commentVO = new HashMap<>();
-            commentVO.put("id", comment.getPid());
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("id", comment.getUser().getUid());
+        userInfo.put("nickname", comment.getUser().getNickname());
+        userInfo.put("avatarUrl", comment.getUser().getAvatarUrl());
+        commentVO.put("user", userInfo);
 
-            Map<String, Object> userInfo = new HashMap<>();
-            userInfo.put("id", comment.getUser().getUid());
-            userInfo.put("nickname", comment.getUser().getNickname());
-            userInfo.put("avatarUrl", comment.getUser().getAvatarUrl());
-            commentVO.put("user", userInfo);
+        commentVO.put("content", comment.getContent());
+        commentVO.put("parentId", parentId);
+        commentVO.put("createdAt", comment.getCreatedAt());
 
-            commentVO.put("content", comment.getContent());
-            commentVO.put("parentId", comment.getParentPost() != null ? comment.getParentPost().getPid() : null);
-            commentVO.put("replies", new ArrayList<Map<String, Object>>());
-            commentVO.put("createdAt", comment.getCreatedAt());
-
-            commentMap.put(comment.getPid(), commentVO);
+        // 查询当前评论的直接子评论，并递归构建
+        List<Post> childComments = postRepository.findByParentPostAndTypeAndStatusOrderByCreatedAtDesc(
+                comment, PostType.COMMENT, ContentStatus.NORMAL);
+        List<Map<String, Object>> replies = new ArrayList<>();
+        for (Post child : childComments) {
+            replies.add(buildCommentNode(child, comment.getPid()));
         }
+        commentVO.put("replies", replies);
 
-        List<Map<String, Object>> rootComments = new ArrayList<>();
-
-        for (Map<String, Object> commentVO : commentMap.values()) {
-            Long parentId = (Long) commentVO.get("parentId");
-
-            if (parentId == null) {
-                rootComments.add(commentVO);
-            } else if (commentMap.containsKey(parentId)) {
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> replies = (List<Map<String, Object>>) commentMap.get(parentId).get("replies");
-                replies.add(commentVO);
-            }
-        }
-
-        return rootComments;
+        return commentVO;
     }
 }

@@ -114,6 +114,7 @@
             v-for="item in comments"
             :key="item.id"
             :comment="item"
+            :level="0"
             @reply="handleReply"
           />
         </div>
@@ -124,12 +125,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineComponent } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Star, ChatDotRound } from '@element-plus/icons-vue'
+import { Star } from '@element-plus/icons-vue'
 import { useContentStore } from '../stores/content'
 import { useAuthStore } from '../stores/auth'
+import CommentItem from '../components/CommentItem.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -182,7 +184,7 @@ const fetchDetail = async () => {
 
 const fetchComments = async () => {
   try {
-    const resp = await contentStore.getComments(contentId, { pageNum: 1, pageSize: 200 })
+    const resp = await contentStore.getComments(contentId, { page: 1, size: 200 })
     const data = resp.data?.data || resp.data || {}
     comments.value = data.list || []
     totalComments.value = data.total || comments.value.length
@@ -245,7 +247,7 @@ const handleSubmitComment = async () => {
 
 const handleReply = (comment) => {
   replyParentId.value = comment.id
-  commentText.value = `@${comment.userNickname || '用户'} `
+  commentText.value = `@${comment.user?.nickname || '用户'} `
 }
 
 const handleBack = () => {
@@ -256,57 +258,6 @@ onMounted(() => {
   fetchDetail()
   fetchComments()
 })
-
-// 简单的多级评论展示组件
-const CommentItem = defineComponent({
-  name: 'CommentItem',
-  props: {
-    comment: {
-      type: Object,
-      required: true
-    }
-  },
-  emits: ['reply'],
-  setup(props, { emit }) {
-    const onReply = () => {
-      emit('reply', props.comment)
-    }
-    return { onReply, resolveAvatarUrl, formatTime }
-  },
-  template: `
-    <div class="comment-item">
-      <div class="comment-main">
-        <el-avatar :size="32" :src="resolveAvatarUrl(comment.user?.avatarUrl)" class="comment-avatar">
-          <span>{{ (comment.user?.nickname || '用').slice(0, 1) }}</span>
-        </el-avatar>
-        <div class="comment-body">
-          <div class="comment-meta">
-            <span class="name">{{ comment.user?.nickname || '用户' }}</span>
-            <span class="time">{{ formatTime(comment.createdAt) }}</span>
-          </div>
-          <div class="comment-text">{{ comment.content }}</div>
-          <div class="comment-actions">
-            <el-button text size="small" @click="onReply">
-              <el-icon><ChatDotRound /></el-icon>
-              <span>回复</span>
-            </el-button>
-          </div>
-        </div>
-      </div>
-      <div class="comment-children" v-if="comment.children && comment.children.length">
-        <comment-item
-          v-for="child in comment.children"
-          :key="child.id"
-          :comment="child"
-          @reply="$emit('reply', $event)"
-        />
-      </div>
-    </div>
-  `
-})
-
-// 注册本地组件
-const commentItem = CommentItem
 </script>
 
 <style scoped>
