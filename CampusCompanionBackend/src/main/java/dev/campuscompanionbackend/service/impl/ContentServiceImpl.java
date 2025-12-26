@@ -59,6 +59,29 @@ public class ContentServiceImpl implements ContentService {
         }
     }
 
+    /**
+     * 尝试从当前请求中获取登录用户 ID，如果不存在或格式不正确则返回 null。
+     * 用于一些不强制要求登录的场景（例如浏览动态列表时判断是否已点赞）。
+     */
+    private Long getCurrentUserIdOrNull() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttributes)) {
+            return null;
+        }
+
+        String userIdHeader = servletAttributes.getRequest().getHeader("X-User-Id");
+        if (userIdHeader == null || userIdHeader.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(userIdHeader);
+        } catch (NumberFormatException e) {
+            log.warn("X-User-Id 头格式错误: {}", userIdHeader);
+            return null;
+        }
+    }
+
     @Override
     @Transactional
     public Long createContent(CreateContentRequest request) {
@@ -391,6 +414,20 @@ public class ContentServiceImpl implements ContentService {
 
         contentVO.put("likeCount", likes.size());
         contentVO.put("commentCount", comments.size());
+
+        // 标记当前登录用户是否已点赞该内容，用于前端在刷新后还原点赞状态
+        boolean liked = false;
+        Long currentUserId = getCurrentUserIdOrNull();
+        if (currentUserId != null) {
+            try {
+                User currentUser = getUserById(currentUserId);
+                liked = postLikeRepository.findByPostAndUser(post, currentUser).isPresent();
+            } catch (BusinessException ex) {
+                // 如果用户不存在等异常，这里只记录日志，不影响列表正常返回
+                log.warn("判断点赞状态时获取当前用户失败: {}", ex.getMessage());
+            }
+        }
+        contentVO.put("liked", liked);
 
         return contentVO;
     }

@@ -15,25 +15,6 @@
           <el-option label="热门优先" value="hot" />
         </el-select>
       </el-form-item>
-      <el-form-item label="类型">
-        <el-select v-model="filters.type" placeholder="请选择" style="width: 160px">
-          <el-option label="全部" :value="null" />
-          <el-option label="内容" :value="0" />
-          <el-option label="评论" :value="1" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="媒体类型">
-        <el-select v-model="filters.mediaType" placeholder="请选择" style="width: 200px">
-          <el-option label="全部" :value="null" />
-          <el-option label="纯文本" :value="0" />
-          <el-option label="图片" :value="1" />
-          <el-option label="视频" :value="2" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="handleFilter">筛选</el-button>
-        <el-button @click="resetFilters">重置</el-button>
-      </el-form-item>
     </el-form>
 
     <el-skeleton v-if="loading" :rows="4" animated />
@@ -46,6 +27,7 @@
           :key="item.id"
           class="content-card"
           shadow="hover"
+          @click="goToDetail(item)"
         >
           <div class="card-header">
             <div class="user-info">
@@ -61,8 +43,8 @@
                 <div class="time">{{ formatTime(item.createdAt) }}</div>
               </div>
             </div>
-            <el-dropdown @command="(command) => handleMore(command, item)">
-              <span class="el-dropdown-link">
+            <el-dropdown v-if="canDelete(item)" @command="(command) => handleMore(command, item)">
+              <span class="el-dropdown-link" @click.stop>
                 更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </span>
               <template #dropdown>
@@ -72,8 +54,7 @@
               </template>
             </el-dropdown>
           </div>
-
-          <div class="card-content" @click="goToDetail(item)">
+          <div class="card-content">
             <p class="text">{{ item.content }}</p>
 
             <div
@@ -152,18 +133,18 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Star, ChatDotRound } from '@element-plus/icons-vue'
 import { useContentStore } from '../stores/content'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const contentStore = useContentStore()
+const authStore = useAuthStore()
 
 const contentsList = ref([])
 const total = ref(0)
 const loading = ref(false)
 
 const filters = reactive({
-  sort: 'latest',
-  type: null,
-  mediaType: null
+  sort: 'latest'
 })
 
 const pagination = reactive({
@@ -185,6 +166,8 @@ const resolveAvatarUrl = (url) => {
   return `${fileBaseUrl}${url}`
 }
 
+const currentUser = computed(() => authStore.user)
+
 const fetchContents = async () => {
   loading.value = true
   try {
@@ -192,8 +175,6 @@ const fetchContents = async () => {
       pageNum: pagination.pageNum,
       pageSize: pagination.pageSize
     }
-    if (filters.type !== null) params.type = filters.type
-    if (filters.mediaType !== null) params.mediaType = filters.mediaType
 
     const response = await contentStore.getContents(params)
     const data = response.data?.data || response.data || {}
@@ -222,19 +203,6 @@ const sortedContents = computed(() => {
   )
 })
 
-const handleFilter = () => {
-  pagination.pageNum = 1
-  fetchContents()
-}
-
-const resetFilters = () => {
-  filters.sort = 'latest'
-  filters.type = null
-  filters.mediaType = null
-  pagination.pageNum = 1
-  fetchContents()
-}
-
 const handleSizeChange = (val) => {
   pagination.pageSize = val
   pagination.pageNum = 1
@@ -250,6 +218,15 @@ const formatTime = (time) => {
   if (!time) return ''
   const date = new Date(time)
   return date.toLocaleString()
+}
+
+const canDelete = (item) => {
+  const user = currentUser.value
+  if (!user) return false
+  // 管理员可以删除任意动态
+  if (user.userType === 1 || user.userType === 'ADMIN') return true
+  // 否则仅作者本人可以删除
+  return item.user && item.user.id === user.id
 }
 
 const handleMore = (command, item) => {
