@@ -11,19 +11,20 @@
           :default-active="activeIndex" 
           class="nav-menu" 
           mode="horizontal"
+          router
           @select="handleSelect"
         >
-          <el-menu-item index="home">
-            <router-link to="/">首页</router-link>
+          <el-menu-item index="/">
+            首页
           </el-menu-item>
-          <el-menu-item index="orders">
-            <router-link to="/orders">订单</router-link>
+          <el-menu-item index="/orders">
+            订单
           </el-menu-item>
-          <el-menu-item index="contents">
-            <router-link to="/contents">动态</router-link>
+          <el-menu-item index="/contents">
+            动态
           </el-menu-item>
-          <el-menu-item index="ai">
-            <router-link to="/ai">AI问询</router-link>
+          <el-menu-item index="/ai">
+            AI问询
           </el-menu-item>
         </el-menu>
         <!-- 移动端下拉菜单 -->
@@ -91,14 +92,13 @@ import { ArrowDown, Menu as MenuIcon } from '@element-plus/icons-vue'
 const router = useRouter()
 const authStore = useAuthStore()
 
-// 计算当前激活的菜单索引
+// 计算当前激活的菜单索引（使用路径，配合 el-menu 的 router 模式）
 const activeIndex = computed(() => {
   const currentPath = router.currentRoute.value.path
-  if (currentPath === '/') return 'home'
-  if (currentPath.startsWith('/orders')) return 'orders'
-  if (currentPath.startsWith('/contents')) return 'contents'
-  if (currentPath.startsWith('/ai')) return 'ai'
-  return 'home'
+  if (currentPath.startsWith('/orders')) return '/orders'
+  if (currentPath.startsWith('/contents')) return '/contents'
+  if (currentPath.startsWith('/ai')) return '/ai'
+  return '/'
 })
 
 // 计算用户认证状态
@@ -106,7 +106,7 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 // 直接返回 store 中的用户对象，便于判断是否需要拉取用户信息
 const userInfo = computed(() => authStore.user)
 
-// 处理菜单选择
+// 处理菜单选择（此处仅做调试/埋点，实际导航由 el-menu 的 router 属性完成）
 const handleSelect = (key, keyPath) => {
   console.log('Selected:', key, keyPath)
 }

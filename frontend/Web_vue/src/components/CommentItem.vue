@@ -14,6 +14,20 @@
           <span class="time">{{ formatTime(comment.createdAt) }}</span>
         </div>
         <div class="comment-text">{{ comment.content }}</div>
+          <div
+            v-if="comment.mediaUrls && comment.mediaUrls.length"
+            class="comment-media"
+          >
+          <el-image
+            v-for="(url, index) in comment.mediaUrls"
+            :key="index"
+            :src="resolveMediaUrl(url)"
+            fit="cover"
+            class="comment-media-image"
+            :preview-src-list="comment.mediaUrls.map(resolveMediaUrl)"
+            lazy
+          />
+        </div>
         <div class="comment-actions">
           <el-button text size="small" @click="onReply">
             <el-icon><ChatDotRound /></el-icon>
@@ -61,6 +75,14 @@ const resolveAvatarUrl = (url) => {
   if (/^https?:\/\//.test(url)) return url
   return `${fileBaseUrl}${url}`
 }
+
+const resolveMediaUrl = (url) => {
+  if (!url) return url
+  if (/^https?:\/\//.test(url)) return url
+  return `${fileBaseUrl}${url}`
+}
+
+const isImageType = (mediaType) => mediaType === 1 || mediaType === 'IMAGE'
 
 const formatTime = (time) => {
   if (!time) return ''
@@ -118,6 +140,18 @@ export default {
   font-size: 14px;
   margin-bottom: 4px;
   white-space: pre-wrap;
+}
+
+.comment-media {
+  margin: 4px 0;
+  display: flex;
+  gap: 6px;
+}
+
+.comment-media-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
 }
 
 .comment-actions {

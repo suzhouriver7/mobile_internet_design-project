@@ -25,6 +25,37 @@
         <div class="card-content">
           <p class="text">{{ content.content }}</p>
 
+          <!-- 附加订单信息卡片 -->
+          <div
+            v-if="content.order"
+            class="order-card"
+            @click="goToOrder(content.order.id)"
+          >
+            <div class="order-card-main">
+              <div class="order-card-title">
+                <div class="order-chip">
+                  <el-icon class="order-chip-icon"><Tickets /></el-icon>
+                  <span class="order-chip-text">订单 #{{ content.order.id }}</span>
+                </div>
+                <span class="order-activity">
+                  {{ getActivityTypeLabel(content.order.activityType) }} ·
+                  {{ content.order.location || '地点待定' }}
+                </span>
+              </div>
+              <div class="order-card-meta">
+                <span class="order-status">
+                  状态：{{ getStatusLabel(content.order.status) }}
+                </span>
+                <span class="order-time">
+                  开始时间：{{ formatTime(content.order.startTime) }}
+                </span>
+              </div>
+            </div>
+            <div class="order-card-arrow">
+              <el-icon><ArrowRight /></el-icon>
+            </div>
+          </div>
+
           <div
               v-if="isImageType(content.mediaType) && content.mediaUrls && content.mediaUrls.length"
             class="media-grid"
@@ -80,7 +111,7 @@
           </div>
         </template>
 
-        <!-- 发表评论 -->
+        <!-- 发表评论（暂不支持附加图片） -->
         <div class="comment-editor">
           <el-input
             v-model="commentText"
@@ -88,15 +119,9 @@
             :rows="3"
             maxlength="300"
             show-word-limit
-            placeholder="友善发言，文明交流～ 支持换行和简单表情 😊"
+            placeholder="友善发言，文明交流～ 支持换行 😊"
           />
           <div class="comment-toolbar">
-            <div class="emoji-bar">
-              <span class="emoji" @click="appendEmoji('😊')">😊</span>
-              <span class="emoji" @click="appendEmoji('😂')">😂</span>
-              <span class="emoji" @click="appendEmoji('👍')">👍</span>
-              <span class="emoji" @click="appendEmoji('❤️')">❤️</span>
-            </div>
             <el-button
               type="primary"
               size="small"
@@ -128,7 +153,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Star } from '@element-plus/icons-vue'
+import { Star, Tickets, ArrowRight } from '@element-plus/icons-vue'
 import { useContentStore } from '../stores/content'
 import { useAuthStore } from '../stores/auth'
 import CommentItem from '../components/CommentItem.vue'
@@ -167,6 +192,38 @@ const formatTime = (time) => {
   if (!time) return ''
   const date = new Date(time)
   return date.toLocaleString()
+}
+
+// 订单相关展示文案
+const activityTypeMap = {
+  BASKETBALL: '篮球',
+  BADMINTON: '羽毛球',
+  MEAL: '吃饭',
+  STUDY: '自习',
+  MOVIE: '看电影',
+  RUNNING: '跑步',
+  GAME: '游戏',
+  OTHER: '其他'
+}
+
+const statusMap = {
+  PENDING: '待匹配',
+  IN_PROGRESS: '进行中',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+  EXPIRED: '已过期'
+}
+
+const getActivityTypeLabel = (type) => {
+  if (!type) return '活动'
+  if (typeof type === 'number') return '活动'
+  return activityTypeMap[type] || '活动'
+}
+
+const getStatusLabel = (status) => {
+  if (!status) return '未知'
+  if (typeof status === 'number') return '状态'
+  return statusMap[status] || '状态'
 }
 
 // 兼容后端返回的媒体类型：既可能是数字 1/2，也可能是字符串 'IMAGE'/'VIDEO'
@@ -215,10 +272,6 @@ const handleLike = async () => {
   }
 }
 
-const appendEmoji = (emoji) => {
-  commentText.value += emoji
-}
-
 const handleSubmitComment = async () => {
   if (!commentText.value.trim()) {
     ElMessage.info('请输入评论内容')
@@ -236,7 +289,20 @@ const handleSubmitComment = async () => {
       content: commentText.value,
       parentId: replyParentId.value
     }
-    await contentStore.createComment(contentId, payload)
+    const resp = await contentStore.createComment(contentId, payload)
+
+    // 从响应中解析评论 ID（后端为 ApiResponse<Long>）
+    let commentId = null
+    const body = resp?.data || {}
+    const rawData = body.data
+    if (rawData != null) {
+      if (typeof rawData === 'number' || typeof rawData === 'string') {
+        commentId = Number(rawData)
+      } else if (typeof rawData === 'object') {
+        commentId = rawData.commentId ?? rawData.id ?? null
+      }
+    }
+
     commentText.value = ''
     replyParentId.value = null
     ElMessage.success('评论发布成功')
@@ -256,6 +322,11 @@ const handleReply = (comment) => {
 
 const handleBack = () => {
   router.back()
+}
+
+const goToOrder = (orderId) => {
+  if (!orderId) return
+  router.push(`/orders/${orderId}`)
 }
 
 onMounted(() => {
@@ -337,6 +408,69 @@ onMounted(() => {
   max-height: 400px;
 }
 
+.order-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  background-color: #f9fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.order-card:hover {
+  background-color: #f5f7fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.order-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.order-chip {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background-color: var(--el-color-info-light-9, #ecf5ff);
+  color: var(--el-color-info, #409eff);
+  white-space: nowrap;
+}
+
+.order-chip-icon {
+  font-size: 14px;
+}
+
+.order-activity {
+  font-size: 13px;
+  color: #606266;
+}
+
+.order-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.order-card-arrow {
+  color: #c0c4cc;
+}
+
 .card-footer {
   display: flex;
   justify-content: space-between;
@@ -377,18 +511,8 @@ onMounted(() => {
 .comment-toolbar {
   margin-top: 8px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-}
-
-.emoji-bar {
-  display: flex;
-  gap: 6px;
-}
-
-.emoji {
-  cursor: pointer;
-  font-size: 18px;
 }
 
 .comment-list {

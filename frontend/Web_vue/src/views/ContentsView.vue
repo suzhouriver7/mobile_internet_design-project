@@ -54,7 +54,7 @@
               </template>
             </el-dropdown>
           </div>
-          <div class="card-content">
+            <div class="card-content">
             <p class="text">{{ item.content }}</p>
 
             <div
@@ -86,8 +86,11 @@
               ></video>
             </div>
 
-            <div v-if="item.orderId" class="order-info">
-              <el-tag size="small" type="info">关联订单：{{ item.orderId }}</el-tag>
+            <div v-if="item.order" class="order-info" @click.stop="goToOrder(item.order.id)">
+              <div class="order-chip">
+                <el-icon class="order-chip-icon"><Tickets /></el-icon>
+                <span class="order-chip-text">订单 #{{ item.order.id }}</span>
+              </div>
             </div>
           </div>
 
@@ -131,7 +134,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Star, ChatDotRound } from '@element-plus/icons-vue'
+import { ArrowDown, Star, ChatDotRound, Tickets } from '@element-plus/icons-vue'
 import { useContentStore } from '../stores/content'
 import { useAuthStore } from '../stores/auth'
 
@@ -282,6 +285,11 @@ const goToDetail = (item) => {
   router.push(`/contents/${item.id}`)
 }
 
+const goToOrder = (orderId) => {
+  if (!orderId) return
+  router.push(`/orders/${orderId}`)
+}
+
 const goToCreate = () => {
   router.push('/contents/create')
 }
@@ -396,6 +404,22 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+.order-chip {
+  display: inline-flex;
+  align-items: center;
+  column-gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background-color: var(--el-color-info-light-9, #ecf5ff);
+  color: var(--el-color-info, #409eff);
+  white-space: nowrap;
+}
+
+.order-chip-icon {
+  font-size: 14px;
+}
+
 .card-footer {
   display: flex;
   justify-content: space-between;
@@ -430,5 +454,4 @@ onMounted(() => {
     padding: 12px;
   }
 }
-</style>
-                .card-footer {
+ </style>

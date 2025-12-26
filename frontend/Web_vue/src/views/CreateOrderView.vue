@@ -43,6 +43,13 @@
             <el-option label="西山校区" :value="'XISHAN'" />
             <el-option label="其他校区" :value="'OTHER_CAMPUS'" />
           </el-select>
+          <div
+            v-if="showMatchingHint"
+            class="matching-hint"
+            @click="goToMatchedOrders"
+          >
+            已找到现有的 {{ matchingCount }} 个订单有同样的需求，点击查看
+          </div>
         </el-form-item>
 
         <el-form-item label="活动地点" prop="location">
@@ -92,7 +99,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useOrderStore } from '../stores/order'
@@ -102,6 +109,8 @@ const orderStore = useOrderStore()
 
 const formRef = ref(null)
 const submitting = ref(false)
+const matchingCount = ref(0)
+const matchingLoading = ref(false)
 
 // 与后端 CreateOrderRequest 完全对齐的字段
 const form = reactive({
@@ -134,6 +143,71 @@ const rules = {
     { required: true, message: '请输入人数上限', trigger: 'change' },
     { type: 'number', min: 1, message: '人数上限必须大于 0', trigger: 'change' }
   ]
+}
+
+// 根据已选择的活动类型和校区，实时统计当前「待匹配」且相同条件的订单数量
+const fetchMatchingOrdersCount = async (activityType, campus) => {
+  if (!activityType || !campus) {
+    matchingCount.value = 0
+    return
+  }
+
+  matchingLoading.value = true
+  try {
+    const params = {
+      page: 1,
+      size: 1,
+      status: 'PENDING',
+      activityType,
+      campus
+    }
+    const res = await orderStore.getOrders(params)
+    const data = res.data?.data || {}
+    matchingCount.value = data.total || 0
+  } catch (error) {
+    console.error('获取匹配订单数量失败', error)
+    matchingCount.value = 0
+  } finally {
+    matchingLoading.value = false
+  }
+}
+
+// 监听活动类型和校区变化，触发统计
+watch(
+  () => [form.activityType, form.campus],
+  ([activityType, campus]) => {
+    if (!activityType || !campus) {
+      matchingCount.value = 0
+      return
+    }
+    fetchMatchingOrdersCount(activityType, campus)
+  }
+)
+
+// 是否展示提示文案
+const showMatchingHint = computed(() => {
+  return (
+    !!form.activityType &&
+    !!form.campus &&
+    !matchingLoading.value &&
+    matchingCount.value > 0
+  )
+})
+
+// 跳转到带预设筛选条件的订单列表页
+const goToMatchedOrders = () => {
+  if (!form.activityType || !form.campus) return
+
+  router.push({
+    path: '/orders',
+    query: {
+      page: '1',
+      size: '10',
+      activityType: form.activityType,
+      campus: form.campus,
+      status: 'PENDING'
+    }
+  })
 }
 
 const handleCancel = () => {
@@ -195,6 +269,17 @@ const handleSubmit = () => {
 
 .order-form {
   margin-top: 10px;
+}
+
+.matching-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #409eff;
+  cursor: pointer;
+}
+
+.matching-hint:hover {
+  text-decoration: underline;
 }
 
 .form-actions {

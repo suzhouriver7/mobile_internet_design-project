@@ -60,6 +60,35 @@
             <template #header>
               <div class="card-header">
                 <span>订单信息</span>
+                <div v-if="canEditOrder" class="edit-actions">
+                  <el-button
+                    v-if="!isEditing"
+                    type="primary"
+                    link
+                    size="small"
+                    @click="startEdit"
+                  >
+                    编辑
+                  </el-button>
+                  <div v-else class="edit-actions-group">
+                    <el-button
+                      size="small"
+                      link
+                      @click="cancelEdit"
+                    >
+                      取消
+                    </el-button>
+                    <el-button
+                      type="primary"
+                      size="small"
+                      :loading="savingEdit"
+                      :disabled="!canSaveEdit"
+                      @click="saveEdit"
+                    >
+                      保存
+                    </el-button>
+                  </div>
+                </div>
               </div>
             </template>
             <div class="order-info-grid">
@@ -84,12 +113,56 @@
                 </span>
               </div>
               <div class="info-item">
-                <span class="label">地点</span>
-                <span class="value">{{ order.location }}</span>
+                <span class="label">
+                  地点
+                  <el-tag
+                    v-if="canEditOrder"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                    class="editable-badge"
+                  >
+                    可编辑
+                  </el-tag>
+                </span>
+                <span class="value" v-if="!isEditing">{{ order.location }}</span>
+                <div v-else class="edit-field">
+                  <el-input
+                    v-model="editForm.location"
+                    size="small"
+                    placeholder="请输入活动地点"
+                    maxlength="100"
+                    show-word-limit
+                  />
+                  <div v-if="locationError" class="field-error">{{ locationError }}</div>
+                </div>
               </div>
               <div class="info-item">
-                <span class="label">开始时间</span>
-                <span class="value">{{ formatDateTime(order.startTime, true) }}</span>
+                <span class="label">
+                  开始时间
+                  <el-tag
+                    v-if="canEditOrder"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                    class="editable-badge"
+                  >
+                    可编辑
+                  </el-tag>
+                </span>
+                <span class="value" v-if="!isEditing">{{ formatDateTime(order.startTime, true) }}</span>
+                <div v-else class="edit-field">
+                  <el-date-picker
+                    v-model="editForm.startTime"
+                    type="datetime"
+                    placeholder="请选择开始时间"
+                    format="YYYY-MM-DD HH:mm:ss"
+                    value-format="YYYY-MM-DD HH:mm:ss"
+                    :teleported="false"
+                    style="width: 100%"
+                  />
+                  <div v-if="startTimeError" class="field-error">{{ startTimeError }}</div>
+                </div>
               </div>
               <div class="info-item">
                 <span class="label">状态</span>
@@ -100,8 +173,35 @@
                 </span>
               </div>
               <div class="info-item">
-                <span class="label">人数</span>
-                <span class="value highlight">{{ order.currentPeople }}/{{ order.maxPeople }}</span>
+                <span class="label">
+                  人数
+                  <el-tag
+                    v-if="canEditOrder"
+                    size="small"
+                    type="warning"
+                    effect="plain"
+                    class="editable-badge"
+                  >
+                    可编辑
+                  </el-tag>
+                </span>
+                <span class="value highlight" v-if="!isEditing">
+                  {{ order.currentPeople }}/{{ order.maxPeople }}
+                </span>
+                <div v-else class="edit-field">
+                  <div class="people-row">
+                    <span class="current-people">当前：{{ order.currentPeople }}</span>
+                    <span class="slash">/</span>
+                    <el-input-number
+                      v-model="editForm.maxPeople"
+                      :min="1"
+                      :step="1"
+                      :precision="0"
+                      size="small"
+                    />
+                  </div>
+                  <div v-if="maxPeopleError" class="field-error">{{ maxPeopleError }}</div>
+                </div>
               </div>
               <div class="info-item">
                 <span class="label">创建时间</span>
@@ -112,9 +212,75 @@
                 <span class="value">{{ formatDateTime(order.updatedAt, true) }}</span>
               </div>
             </div>
-            <div class="note-block" v-if="order.note">
-              <div class="note-label">备注说明</div>
-              <div class="note-content">{{ order.note }}</div>
+            <div class="note-block">
+              <div class="note-label">
+                备注说明
+                <el-tag
+                  v-if="canEditOrder"
+                  size="small"
+                  type="warning"
+                  effect="plain"
+                  class="editable-badge"
+                >
+                  可编辑
+                </el-tag>
+              </div>
+              <template v-if="!isEditing">
+                <div v-if="order.note" class="note-content">{{ order.note }}</div>
+                <div v-else class="note-content note-empty">暂无备注</div>
+              </template>
+              <template v-else>
+                <el-input
+                  v-model="editForm.note"
+                  type="textarea"
+                  :rows="3"
+                  maxlength="200"
+                  show-word-limit
+                  placeholder="请输入备注（选填）"
+                />
+                <div v-if="noteError" class="field-error">{{ noteError }}</div>
+              </template>
+            </div>
+
+            <div class="history-block" v-if="editHistory.length > 0">
+              <div class="history-label">修改记录（本页会话）</div>
+              <div class="history-list">
+                <div
+                  v-for="item in editHistory"
+                  :key="item.id"
+                  class="history-item"
+                >
+                  <div class="history-meta">
+                    <span class="history-time">{{ formatDateTime(item.time, true) }}</span>
+                  </div>
+                  <div class="history-diff">
+                    <div class="history-row">
+                      <span class="history-field">地点</span>
+                      <span class="history-value old">{{ item.before.location || '（空）' }}</span>
+                      <span class="history-arrow">→</span>
+                      <span class="history-value new">{{ item.after.location || '（空）' }}</span>
+                    </div>
+                    <div class="history-row">
+                      <span class="history-field">开始</span>
+                      <span class="history-value old">{{ item.before.startTime || '（空）' }}</span>
+                      <span class="history-arrow">→</span>
+                      <span class="history-value new">{{ item.after.startTime || '（空）' }}</span>
+                    </div>
+                    <div class="history-row">
+                      <span class="history-field">人数</span>
+                      <span class="history-value old">{{ item.before.maxPeople ?? '（空）' }}</span>
+                      <span class="history-arrow">→</span>
+                      <span class="history-value new">{{ item.after.maxPeople ?? '（空）' }}</span>
+                    </div>
+                    <div class="history-row">
+                      <span class="history-field">备注</span>
+                      <span class="history-value old">{{ item.before.note || '（空）' }}</span>
+                      <span class="history-arrow">→</span>
+                      <span class="history-value new">{{ item.after.note || '（空）' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -157,6 +323,7 @@
                           type="success"
                           text
                           size="small"
+                          :disabled="!canApproveApply(apply)"
                           @click.stop="handleAudit(apply, 'APPROVED')"
                         >
                           通过
@@ -198,7 +365,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
@@ -288,6 +455,28 @@ const publisherAvatarUrl = computed(() => {
   return resolveAvatarUrl(publisher.value.avatarUrl)
 })
 
+// 编辑状态与表单
+const isEditing = ref(false)
+const savingEdit = ref(false)
+const editForm = reactive({
+  location: '',
+  startTime: '',
+  maxPeople: null,
+  note: ''
+})
+
+// 本页会话内的修改记录
+const editHistory = ref([])
+
+// 订单是否已达到人数上限
+const isOrderFull = computed(() => {
+  if (!order.value) return false
+  const current = Number(order.value.currentPeople || 0)
+  const max = Number(order.value.maxPeople || 0)
+  if (Number.isNaN(current) || Number.isNaN(max) || max <= 0) return false
+  return current >= max
+})
+
 const publisherInitial = computed(() => {
   if (publisher.value?.nickname) {
     return publisher.value.nickname.slice(0, 1)
@@ -340,6 +529,13 @@ const isPublisher = computed(() => {
   return order.value.user.id === currentUserId.value
 })
 
+// 是否可以编辑订单（仅发布者 + 待匹配状态）
+const canEditOrder = computed(() => {
+  if (!order.value) return false
+  if (!isPublisher.value) return false
+  return order.value.status === 'PENDING'
+})
+
 // 判断某条申请是否属于当前登录用户
 const isMyApplication = (apply) => {
   if (!currentUserId.value || !apply?.user) return false
@@ -363,6 +559,154 @@ const canAuditApply = (apply) => {
   if (!isPublisher.value) return false
   if (!order.value || order.value.status !== 'PENDING') return false
   return isPendingApply(apply)
+}
+
+// 是否可以对该申请执行“通过”操作（已满时不允许）
+const canApproveApply = (apply) => {
+  if (!canAuditApply(apply)) return false
+  if (isOrderFull.value) return false
+  return true
+}
+
+// 实时校验
+const locationError = computed(() => {
+  if (!isEditing.value) return ''
+  const value = (editForm.location || '').trim()
+  if (!value) return '地点不能为空'
+  if (value.length > 100) return '地点不能超过 100 个字符'
+  return ''
+})
+
+const noteError = computed(() => {
+  if (!isEditing.value) return ''
+  const value = editForm.note || ''
+  if (value.length > 200) return '备注不能超过 200 个字符'
+  return ''
+})
+
+const startTimeError = computed(() => {
+  if (!isEditing.value) return ''
+  const value = editForm.startTime
+  if (!value) return '开始时间不能为空'
+  const d = new Date(value.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return '开始时间格式不正确'
+  return ''
+})
+
+const maxPeopleError = computed(() => {
+  if (!isEditing.value) return ''
+  const val = Number(editForm.maxPeople)
+  if (!Number.isInteger(val) || val <= 0) {
+    return '人数上限必须为正整数'
+  }
+  if (order.value) {
+    const current = Number(order.value.currentPeople || 0)
+    if (val < current) {
+      return `人数上限不能小于当前人数（${current}）`
+    }
+  }
+  return ''
+})
+
+const canSaveEdit = computed(() => {
+  if (!isEditing.value) return false
+  if (locationError.value || startTimeError.value || maxPeopleError.value || noteError.value) return false
+  return true
+})
+
+const initEditFormFromOrder = () => {
+  if (!order.value) return
+  editForm.location = order.value.location || ''
+   editForm.startTime = buildStartTimeString()
+   editForm.maxPeople = order.value.maxPeople ?? null
+  editForm.note = order.value.note || ''
+}
+
+const buildStartTimeString = () => {
+  if (!order.value?.startTime) return ''
+  const raw = order.value.startTime
+  if (typeof raw === 'string') {
+    return raw.replace('T', ' ').slice(0, 19)
+  }
+  return formatDateTime(raw, true)
+}
+
+const startEdit = () => {
+  if (!canEditOrder.value) return
+  initEditFormFromOrder()
+  isEditing.value = true
+}
+
+const cancelEdit = () => {
+  isEditing.value = false
+}
+
+const saveEdit = async () => {
+  if (!canEditOrder.value || !order.value) return
+  if (!canSaveEdit.value) {
+    ElMessage.error('请先修正表单中的错误')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要保存对订单文本信息的修改吗？',
+      '确认修改',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning',
+        draggable: true
+      }
+    )
+
+    savingEdit.value = true
+
+    const beforeSnapshot = {
+      location: order.value.location || '',
+      startTime: buildStartTimeString(),
+      maxPeople: order.value.maxPeople,
+      note: order.value.note || ''
+    }
+
+    const payload = {
+      activityType: order.value.activityType,
+      genderRequire: order.value.genderRequire,
+      campus: order.value.campus,
+      location: (editForm.location || '').trim(),
+      startTime: editForm.startTime,
+      note: editForm.note || '',
+      maxPeople: editForm.maxPeople
+    }
+
+    await orderStore.updateOrder(order.value.id, payload)
+    await loadDetail()
+
+    const afterSnapshot = {
+      location: order.value.location || '',
+      startTime: buildStartTimeString(),
+      maxPeople: order.value.maxPeople,
+      note: order.value.note || ''
+    }
+
+    editHistory.value.unshift({
+      id: Date.now(),
+      time: new Date().toISOString(),
+      before: beforeSnapshot,
+      after: afterSnapshot
+    })
+
+    isEditing.value = false
+    ElMessage.success('订单信息已更新')
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+    const message = error?.response?.data?.message || error?.message || '修改订单失败'
+    ElMessage.error(message)
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 const normalizeDetail = () => {
@@ -540,6 +884,18 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .publisher-info {
   display: flex;
   align-items: center;
@@ -625,6 +981,36 @@ onMounted(() => {
   color: #303133;
 }
 
+.editable-badge {
+  margin-left: 6px;
+}
+
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.people-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.current-people {
+  font-size: 13px;
+  color: #606266;
+}
+
+.slash {
+  color: #909399;
+}
+
+.field-error {
+  font-size: 12px;
+  color: #f56c6c;
+}
+
 .highlight {
   font-weight: 600;
   color: #409eff;
@@ -646,6 +1032,71 @@ onMounted(() => {
   font-size: 14px;
   color: #303133;
   white-space: pre-wrap;
+}
+
+.note-empty {
+  color: #c0c4cc;
+}
+
+.history-block {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #ebeef5;
+}
+
+.history-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: #f9fafc;
+}
+
+.history-meta {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.history-field {
+  width: 36px;
+  color: #909399;
+}
+
+.history-value {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-value.old {
+  color: #909399;
+}
+
+.history-value.new {
+  color: #409eff;
+}
+
+.history-arrow {
+  color: #c0c4cc;
 }
 
 .apply-count {

@@ -60,8 +60,12 @@
               <el-option label="已过期" value="EXPIRED" />
           </el-select>
         </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="onlyMine" :disabled="loading">
+              我发布的
+            </el-checkbox>
+          </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">查询</el-button>
           <el-button @click="resetForm" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
@@ -147,7 +151,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOrderStore } from '../stores/order'
@@ -165,6 +169,9 @@ const total = ref(0)
 const ordersList = ref([])
 // 记录当前用户已申请的订单，key 为 orderId
 const appliedOrderMap = ref({})
+
+// 仅查看我发布的订单
+const onlyMine = ref(false)
 
 const searchForm = reactive({
   activityType: '',
@@ -328,6 +335,9 @@ const applyLocalFilter = (list) => {
     if (searchForm.status && item.status !== searchForm.status) {
       return false
     }
+    if (onlyMine.value && !isPublisher(item)) {
+      return false
+    }
     return true
   })
 }
@@ -346,6 +356,10 @@ const buildQueryFromState = () => {
   }
   if (searchForm.status) {
     query.status = searchForm.status
+  }
+
+  if (onlyMine.value) {
+    query.onlyMine = '1'
   }
 
   return query
@@ -376,6 +390,10 @@ const applyStateFromRoute = () => {
   }
   if (typeof q.status === 'string') {
     searchForm.status = q.status
+  }
+
+  if (q.onlyMine === '1' || q.onlyMine === 'true') {
+    onlyMine.value = true
   }
 }
 
@@ -410,7 +428,7 @@ const fetchOrders = async () => {
       return item
     })
 
-    const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status)
+    const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status || onlyMine.value)
     if (hasFilter) {
       list = applyLocalFilter(list)
     }
@@ -433,16 +451,11 @@ const fetchOrders = async () => {
   }
 }
 
-const handleSearch = () => {
-  currentPage.value = 1
-  syncRouteWithState()
-  fetchOrders()
-}
-
 const resetForm = () => {
   Object.keys(searchForm).forEach(key => {
     searchForm[key] = ''
   })
+  onlyMine.value = false
   currentPage.value = 1
   syncRouteWithState()
   fetchOrders()
@@ -518,6 +531,21 @@ onMounted(() => {
   syncRouteWithState()
   fetchOrders()
 })
+
+// 监听筛选条件，自动刷新列表
+watch(
+  () => ({
+    activityType: searchForm.activityType,
+    campus: searchForm.campus,
+    status: searchForm.status,
+    onlyMine: onlyMine.value
+  }),
+  () => {
+    currentPage.value = 1
+    syncRouteWithState()
+    fetchOrders()
+  }
+)
 </script>
 
 <style scoped>
