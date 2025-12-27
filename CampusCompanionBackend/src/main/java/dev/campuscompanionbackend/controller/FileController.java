@@ -53,4 +53,16 @@ public class FileController extends BaseController {
         String message = deleted ? "删除成功" : "文件不存在";
         return success(message, deleted);
     }
+
+    /**
+     * 删除文件
+     * @param pmid 文件ID
+     * @return ApiResponse<Boolean>
+     */
+    @DeleteMapping
+    public ApiResponse<Boolean> deleteFile(@RequestParam("pmid") Long pmid) {
+        boolean deleted = fileService.deleteFile(pmid);
+        String message = deleted ? "删除成功" : "文件不存在";
+        return success(message, deleted);
+    }
 }

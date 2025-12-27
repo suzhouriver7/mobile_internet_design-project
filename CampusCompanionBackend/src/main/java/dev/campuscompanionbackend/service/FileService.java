@@ -2,8 +2,6 @@ package dev.campuscompanionbackend.service;
 
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 /**
  * 文件服务接口
  */
@@ -29,4 +27,11 @@ public interface FileService {
      * @return boolean 是否删除成功
      */
     boolean deleteFile(String fileUrl);
+
+    /**
+     * 删除文件
+     * @param pmid 文件ID
+     * @return boolean 是否删除成功
+     */
+    boolean deleteFile(Long pmid);
 }

@@ -161,6 +161,35 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     @Transactional
+    public Long updateContent(Long contentId, CreateContentRequest request) {
+        log.info("修改动态: contentId={}", contentId);
+
+        Post post = getPostById(contentId);
+
+        if (post.getType() != PostType.POST) {
+            log.error("修改非动态类型");
+        } else {
+            if (request.getContent() != null) {
+                post.setContent(request.getContent());
+            }
+
+            if (request.getMediaType() != null) {
+                post.setHasMedia(request.getMediaType());
+            }
+
+            if (request.getOrderId() != null) {
+                post.setOrder(getOrderById(request.getOrderId()));
+            }
+
+            post.setUpdatedAt(LocalDateTime.now());
+            postRepository.save(post);
+        }
+
+        return contentId;
+    }
+
+    @Override
+    @Transactional
     public void deleteContent(Long contentId) {
         log.info("删除动态: contentId={}", contentId);
 
@@ -239,6 +268,24 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     @Transactional
+    public List<PostMedia> getMedias(Long contentId) {
+        log.info("获取动态所有媒体文件: contentId={}", contentId);
+
+        Post post = getPostById(contentId);
+
+        if (post.getType() != PostType.POST) {
+            log.error("获取非动态媒体文件");
+        } else if (post.getHasMedia() == MediaType.TEXT_ONLY) {
+            log.error("获取纯文本动态媒体文件");
+        } else {
+            return postMediaRepository.findByPost(post);
+        }
+
+        return null;
+    }
+
+    @Override
+    @Transactional
     public Long createComment(Long contentId, CreateCommentRequest request) {
         log.info("发布评论: contentId={}, parentId={}", contentId, request.getParentId());
         Long currentUserId = getCurrentUserIdOrThrow();
@@ -301,7 +348,7 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     @Transactional
-    public Object likeContent(Long contentId) {
+    public Map<String, Object> likeContent(Long contentId) {
         log.info("点赞/取消点赞: contentId={}", contentId);
 
         Post post = getPostById(contentId);

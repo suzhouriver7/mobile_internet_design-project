@@ -1,8 +1,11 @@
 package dev.campuscompanionbackend.service.impl;
 
+import dev.campuscompanionbackend.entity.PostMedia;
 import dev.campuscompanionbackend.exception.FileDeleteFailedException;
 import dev.campuscompanionbackend.exception.FileUploadFailedException;
+import dev.campuscompanionbackend.repository.PostMediaRepository;
 import dev.campuscompanionbackend.service.FileService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -12,11 +15,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
+
+    private final PostMediaRepository postMediaRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String baseUploadDir;
@@ -41,6 +46,8 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public boolean deleteFile(String fileUrl) {
+        log.info("删除文件: fileUrl={}", fileUrl);
+
         if (fileUrl == null || fileUrl.trim().isEmpty()) {
             throw new FileDeleteFailedException("文件url为空");
         }
@@ -82,6 +89,20 @@ public class FileServiceImpl implements FileService {
             log.error("删除文件时权限不足: {}", fileUrl, e);
             throw new FileDeleteFailedException("没有权限删除文件", e);
         }
+    }
+
+    @Override
+    public boolean deleteFile(Long pmid) {
+        log.info("删除文件: pmid={}", pmid);
+        if (pmid == null) {
+            throw new FileDeleteFailedException("文件pmid为空");
+        }
+        PostMedia media = postMediaRepository.findById(pmid).orElse(null);
+        if (media == null) {
+            throw new FileDeleteFailedException("未找到文件");
+        }
+
+        return deleteFile(media.getUrl());
     }
 
     private String uploadFile(MultipartFile file, String uploadDir, String fileType) {
