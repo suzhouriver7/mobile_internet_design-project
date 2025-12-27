@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, register as apiRegister, logout as apiLogout, getUserInfo as apiGetUserInfo } from '../services/auth'
 import logger from '../utils/logger'
+import { useUserStore } from './user'
 
 export const useAuthStore = defineStore('auth', () => {
   // 状态
@@ -26,6 +27,14 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('token', token.value)
       if (user.value?.id) {
         localStorage.setItem('userId', String(user.value.id))
+      }
+
+      // 切换账号时清理用户详情缓存，避免个人中心残留上一个用户的数据
+      try {
+        const userStore = useUserStore()
+        userStore.currentUser = null
+      } catch (e) {
+        console.error('重置用户详情状态失败', e)
       }
 
       logger.event('USER_LOGIN_SUCCESS', {
@@ -79,6 +88,15 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       localStorage.removeItem('token')
       localStorage.removeItem('userId')
+      // 清理用户详情相关状态，防止下次登录看到上一个用户的信息
+      try {
+        const userStore = useUserStore()
+        userStore.currentUser = null
+        userStore.users = []
+        userStore.error = null
+      } catch (e) {
+        console.error('清理用户 store 状态失败', e)
+      }
       logger.event('USER_LOGOUT', {})
     }
   }

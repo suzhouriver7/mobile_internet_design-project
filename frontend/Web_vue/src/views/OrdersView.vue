@@ -60,8 +60,12 @@
               <el-option label="已过期" value="EXPIRED" />
           </el-select>
         </el-form-item>
+          <el-form-item>
+            <el-checkbox v-model="onlyMine" :disabled="loading">
+              我发布的
+            </el-checkbox>
+          </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch" :loading="loading">查询</el-button>
           <el-button @click="resetForm" :disabled="loading">重置</el-button>
         </el-form-item>
       </el-form>
@@ -114,8 +118,13 @@
             <el-button type="primary" size="small" @click="handleViewDetail(scope.row.id)">
               详情
             </el-button>
-            <el-button type="success" size="small" @click="handleApplyOrder(scope.row.id)">
-              申请
+            <el-button
+              type="success"
+              size="small"
+              :disabled="isApplyDisabled(scope.row)"
+              @click="handleApplyOrder(scope.row)"
+            >
+              {{ getApplyButtonText(scope.row) }}
             </el-button>
           </template>
         </el-table-column>
@@ -142,25 +151,37 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useOrderStore } from '../stores/order'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const orderStore = useOrderStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const ordersList = ref([])
+// 记录当前用户已申请的订单，key 为 orderId
+const appliedOrderMap = ref({})
+
+// 仅查看我发布的订单
+const onlyMine = ref(false)
 
 const searchForm = reactive({
   activityType: '',
   campus: '',
   status: ''
+})
+
+// 当前登录用户 ID
+const currentUserId = computed(() => {
+  return authStore.user?.id || Number(localStorage.getItem('userId')) || null
 })
 
 // 活动类型映射
@@ -226,6 +247,83 @@ const resolveAvatarUrl = (url) => {
   return `${fileBaseUrl}${url}`
 }
 
+// 判断是否是当前用户发布的订单
+const isPublisher = (order) => {
+  if (!currentUserId.value || !order?.user) return false
+  return order.user.id === currentUserId.value
+}
+
+// 判断当前用户是否已申请过该订单
+const hasApplied = (order) => {
+  if (!order?.id) return false
+  return !!appliedOrderMap.value[order.id]
+}
+
+// 申请按钮是否应禁用
+const isApplyDisabled = (order) => {
+  if (!order) return true
+
+  // 发布者：仅在订单未取消且为待匹配状态时允许“取消订单”
+  if (isPublisher(order)) {
+    if (order.status === 'CANCELLED') return true
+    return order.status !== 'PENDING' ? true : false
+  }
+
+  // 非发布者：已申请、非待匹配状态都不允许再申请
+  if (hasApplied(order)) return true
+  if (order.status !== 'PENDING') return true
+  // 人数已满时不允许继续申请
+  if (order.currentPeople >= order.maxPeople) return true
+  return false
+}
+
+// 申请按钮文案
+const getApplyButtonText = (order) => {
+  if (!order) return '申请'
+
+  if (isPublisher(order)) {
+    if (order.status === 'CANCELLED') return '已取消'
+    if (order.status !== 'PENDING') return '不可操作'
+    return '取消订单'
+  }
+
+  if (hasApplied(order)) return '已申请'
+  if (order.status !== 'PENDING') return '不可申请'
+  if (order.currentPeople >= order.maxPeople) return '人数已满'
+  return '申请'
+}
+
+// 加载某一页订单中，当前用户是否已申请
+const loadAppliedInfoForOrders = async (list) => {
+  const userId = currentUserId.value
+  if (!userId || !Array.isArray(list) || list.length === 0) return
+
+  try {
+    const tasks = list.map(async (item) => {
+      if (!item?.id) return
+      try {
+        const res = await orderStore.getApplications(item.id)
+        const apps = res.data?.data || []
+          // 只把仍然有效、未撤销的申请视为“已申请”
+          const applied = apps.some(app => {
+            if (!app.user || app.user.id !== userId) return false
+            // 后端取消申请后状态为 CANCELLED_APPLY，不再算作已申请
+            return app.status !== 'CANCELLED_APPLY'
+          })
+        if (applied) {
+          appliedOrderMap.value[item.id] = true
+        }
+      } catch (e) {
+        // 单个订单申请列表出错时忽略，避免影响整体
+        console.error('获取申请列表失败', e)
+      }
+    })
+    await Promise.all(tasks)
+  } catch (e) {
+    console.error('批量获取申请信息失败', e)
+  }
+}
+
 const applyLocalFilter = (list) => {
   return list.filter((item) => {
     if (searchForm.activityType && item.activityType !== searchForm.activityType) {
@@ -235,6 +333,9 @@ const applyLocalFilter = (list) => {
       return false
     }
     if (searchForm.status && item.status !== searchForm.status) {
+      return false
+    }
+    if (onlyMine.value && !isPublisher(item)) {
       return false
     }
     return true
@@ -255,6 +356,10 @@ const buildQueryFromState = () => {
   }
   if (searchForm.status) {
     query.status = searchForm.status
+  }
+
+  if (onlyMine.value) {
+    query.onlyMine = '1'
   }
 
   return query
@@ -286,6 +391,10 @@ const applyStateFromRoute = () => {
   if (typeof q.status === 'string') {
     searchForm.status = q.status
   }
+
+  if (q.onlyMine === '1' || q.onlyMine === 'true') {
+    onlyMine.value = true
+  }
 }
 
 const syncRouteWithState = () => {
@@ -303,6 +412,9 @@ const fetchOrders = async () => {
       ...(searchForm.campus && { campus: searchForm.campus }),
       ...(searchForm.status && { status: searchForm.status })
     }
+    // 每次查询前清空已申请信息
+    appliedOrderMap.value = {}
+
     const response = await orderStore.getOrders(params)
     // 后端返回 ApiResponse<Object>，其中 data 为分页结果
     const serverData = response.data?.data || {}
@@ -316,13 +428,22 @@ const fetchOrders = async () => {
       return item
     })
 
-    const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status)
+    const hasFilter = !!(searchForm.activityType || searchForm.campus || searchForm.status || onlyMine.value)
     if (hasFilter) {
       list = applyLocalFilter(list)
     }
 
-    ordersList.value = list
-    total.value = hasFilter ? list.length : serverData.total
+    // 加载当前用户是否已申请过这些订单的信息
+    await loadAppliedInfoForOrders(list)
+
+    // 订单可见性控制：已取消订单仅发布者和曾申请者可见
+    const visibleList = list.filter((item) => {
+      if (item.status !== 'CANCELLED') return true
+      return isPublisher(item) || hasApplied(item)
+    })
+
+    ordersList.value = visibleList
+    total.value = hasFilter ? visibleList.length : serverData.total
   } catch (error) {
     ElMessage.error(error.message || '获取订单列表失败')
   } finally {
@@ -330,16 +451,11 @@ const fetchOrders = async () => {
   }
 }
 
-const handleSearch = () => {
-  currentPage.value = 1
-  syncRouteWithState()
-  fetchOrders()
-}
-
 const resetForm = () => {
   Object.keys(searchForm).forEach(key => {
     searchForm[key] = ''
   })
+  onlyMine.value = false
   currentPage.value = 1
   syncRouteWithState()
   fetchOrders()
@@ -365,10 +481,45 @@ const handleCreateOrder = () => {
   router.push('/orders/create')
 }
 
-const handleApplyOrder = async (orderId) => {
+const handleApplyOrder = async (order) => {
+  if (!order?.id) return
+  
+  // 发布者点击：执行“取消订单”逻辑
+  if (isPublisher(order)) {
+    if (order.status === 'CANCELLED') return
+    try {
+      await ElMessageBox.confirm(
+        '确定要取消此订单吗？此操作不可撤销。',
+        '取消订单确认',
+        {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning',
+          draggable: true
+        }
+      )
+      await orderStore.deleteOrder(order.id)
+      ElMessage.success('订单已取消')
+      // 重新加载列表，刷新状态与可见性
+      fetchOrders()
+    } catch (error) {
+      if (error === 'cancel' || error === 'close') {
+        return
+      }
+      ElMessage.error(error?.message || '取消订单失败')
+    }
+    return
+  }
+
+  // 非发布者：执行申请逻辑
+  if (isApplyDisabled(order)) return
+
   try {
-    await orderStore.applyOrder(orderId)
+    await orderStore.applyOrder(order.id)
     ElMessage.success('申请成功')
+    // 前端直接标记为已申请，避免再次点击
+    appliedOrderMap.value[order.id] = true
+    // 重新拉取列表数据，刷新人数等信息
     fetchOrders()
   } catch (error) {
     ElMessage.error(error.message || '申请失败')
@@ -380,6 +531,21 @@ onMounted(() => {
   syncRouteWithState()
   fetchOrders()
 })
+
+// 监听筛选条件，自动刷新列表
+watch(
+  () => ({
+    activityType: searchForm.activityType,
+    campus: searchForm.campus,
+    status: searchForm.status,
+    onlyMine: onlyMine.value
+  }),
+  () => {
+    currentPage.value = 1
+    syncRouteWithState()
+    fetchOrders()
+  }
+)
 </script>
 
 <style scoped>

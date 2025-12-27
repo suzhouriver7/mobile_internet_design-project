@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import logger from '../utils/logger'
 
+import ContentDetailView from '../views/ContentDetailView.vue'
 const routes = [
   {
     path: '/',
@@ -55,6 +56,12 @@ const routes = [
     name: 'AI',
     component: () => import('../views/AIView.vue'),
     meta: { title: 'AI问询' }
+  },
+  {
+    path: '/contents/:id',
+    name: 'ContentDetail',
+    component: ContentDetailView,
+    meta: { requiresAuth: false, title: '动态详情' }
   },
   {
     path: '/user/profile',

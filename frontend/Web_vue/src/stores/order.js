@@ -84,6 +84,24 @@ export const useOrderStore = defineStore('order', {
       }
     },
 
+    async cancelApply(orderId) {
+      this.loading = true
+      try {
+        const response = await api.delete(`/orders/${orderId}/apply`)
+        logger.event('ORDER_APPLY_CANCEL', { orderId })
+        return response
+      } catch (error) {
+        logger.error('ORDER_APPLY_CANCEL_FAILED', {
+          orderId,
+          message: error.response?.data?.message || error.message,
+          status: error.response?.status
+        })
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updateOrder(orderId, orderData) {
       this.loading = true
       try {
