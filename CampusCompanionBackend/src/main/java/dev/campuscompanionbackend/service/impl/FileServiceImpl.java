@@ -1,6 +1,6 @@
 package dev.campuscompanionbackend.service.impl;
 
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.FileUploadFailedException;
 import dev.campuscompanionbackend.service.FileService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,20 +35,20 @@ public class FileServiceImpl implements FileService {
 
     private String uploadFile(MultipartFile file, String uploadDir, String fileType) {
         if (file.isEmpty()) {
-            throw new BusinessException(1007, "文件不能为空");
+            throw new FileUploadFailedException("文件为空");
         }
 
         String contentType = file.getContentType();
         if (contentType == null) {
-            throw new BusinessException(1007, "无法识别的文件类型");
+            throw new FileUploadFailedException("无法识别的文件类型: " + file.getOriginalFilename());
         }
 
         if ("image".equals(fileType) && !contentType.startsWith("image/")) {
-            throw new BusinessException(1007, "请上传图片文件");
+            throw new FileUploadFailedException("请上传图片文件: file=" + file.getOriginalFilename());
         }
 
         if ("video".equals(fileType) && !contentType.startsWith("video/")) {
-            throw new BusinessException(1007, "请上传视频文件");
+            throw new FileUploadFailedException("请上传视频文件: file=" + file.getOriginalFilename());
         }
 
         try {
@@ -70,7 +70,7 @@ public class FileServiceImpl implements FileService {
             return "/" + uploadDir + filename;
         } catch (IOException e) {
             log.error("上传文件失败", e);
-            throw new BusinessException(1007, "上传文件失败: " + e.getMessage());
+            throw new FileUploadFailedException("上传文件失败", e);
         }
     }
 }
