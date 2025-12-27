@@ -2,6 +2,8 @@ package dev.campuscompanionbackend.service;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 /**
  * 文件服务接口
  */
@@ -20,4 +22,11 @@ public interface FileService {
      * @return String 视频URL
      */
     String uploadVideo(MultipartFile video);
+
+    /**
+     * 删除文件
+     * @param fileUrl 文件URL
+     * @return boolean 是否删除成功
+     */
+    boolean deleteFile(String fileUrl);
 }

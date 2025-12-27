@@ -3,10 +3,7 @@ package dev.campuscompanionbackend.controller;
 import dev.campuscompanionbackend.dto.response.ApiResponse;
 import dev.campuscompanionbackend.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -43,5 +40,17 @@ public class FileController extends BaseController {
     public ApiResponse<String> uploadVideo(@RequestParam("video") MultipartFile video) {
         String url = fileService.uploadVideo(video);
         return success("上传成功", url);
+    }
+
+    /**
+     * 删除文件
+     * @param fileUrl 文件URL
+     * @return ApiResponse<Boolean>
+     */
+    @DeleteMapping
+    public ApiResponse<Boolean> deleteFile(@RequestParam("fileUrl") String fileUrl) {
+        boolean deleted = fileService.deleteFile(fileUrl);
+        String message = deleted ? "删除成功" : "文件不存在";
+        return success(message, deleted);
     }
 }

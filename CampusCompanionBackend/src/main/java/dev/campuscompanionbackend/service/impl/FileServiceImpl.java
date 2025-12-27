@@ -1,8 +1,10 @@
 package dev.campuscompanionbackend.service.impl;
 
+import dev.campuscompanionbackend.exception.FileDeleteFailedException;
 import dev.campuscompanionbackend.exception.FileUploadFailedException;
 import dev.campuscompanionbackend.service.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -10,10 +12,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 @Slf4j
 @Service
 public class FileServiceImpl implements FileService {
+
+    @Value("${file.upload-dir:uploads}")
+    private String baseUploadDir;
 
     @Override
     public String uploadImage(MultipartFile image) {
@@ -31,6 +37,51 @@ public class FileServiceImpl implements FileService {
                 video.getSize() / 1024);
 
         return uploadFile(video, "uploads/videos/", "video");
+    }
+
+    @Override
+    public boolean deleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            throw new FileDeleteFailedException("文件url为空");
+        }
+
+        try {
+            String url = fileUrl.startsWith("/") ? fileUrl.substring(1) : fileUrl;
+            Path filePath = Paths.get(baseUploadDir).getParent().resolve(url);
+
+            Path basePath = Paths.get("").toAbsolutePath().normalize();
+            Path normalizedFilePath = filePath.normalize();
+
+            if (!normalizedFilePath.startsWith(basePath.resolve(baseUploadDir))) {
+                log.warn("尝试访问非法文件路径: {}", normalizedFilePath);
+                throw new FileDeleteFailedException("非法文件路径");
+            }
+
+            if (!Files.exists(normalizedFilePath)) {
+                log.warn("文件不存在: {}", normalizedFilePath);
+                throw new FileDeleteFailedException("文件不存在");
+            }
+
+            if (!Files.isRegularFile(normalizedFilePath)) {
+                log.warn("路径不是文件: {}", normalizedFilePath);
+                throw new FileDeleteFailedException("指定的路径不是一个文件");
+            }
+
+            boolean deleted = Files.deleteIfExists(normalizedFilePath);
+            if (deleted) {
+                log.info("文件删除成功: {}", normalizedFilePath);
+            } else {
+                log.warn("文件删除失败: {}", normalizedFilePath);
+                throw new FileDeleteFailedException("文件删除失败");
+            }
+            return deleted;
+        } catch (IOException e) {
+            log.error("删除文件时发生IO异常: {}", fileUrl, e);
+            throw new FileDeleteFailedException("删除文件失败: " + e.getMessage(), e);
+        } catch (SecurityException e) {
+            log.error("删除文件时权限不足: {}", fileUrl, e);
+            throw new FileDeleteFailedException("没有权限删除文件", e);
+        }
     }
 
     private String uploadFile(MultipartFile file, String uploadDir, String fileType) {
