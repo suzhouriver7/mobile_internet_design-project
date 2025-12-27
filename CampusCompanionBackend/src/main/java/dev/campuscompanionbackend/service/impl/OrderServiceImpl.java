@@ -265,16 +265,29 @@ public class OrderServiceImpl implements OrderService {
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
 
-        if (orderApplyRepository.existsByOrderAndUser(order, currentUser)) {
-            throw new BusinessException(1008, "已申请过该订单");
+        // 一个用户对同一订单只能有一条申请记录
+        // 如果之前申请过且未撤销，则不允许重复申请；
+        // 如果之前是已撤销状态，则视为重新申请，直接将状态改回 PENDING_REVIEW。
+        Optional<OrderApply> optionalApply = orderApplyRepository.findByOrderAndUser(order, currentUser);
+
+        OrderApply targetApply;
+        if (optionalApply.isPresent()) {
+            OrderApply existing = optionalApply.get();
+            if (existing.getStatus() != ApplyStatus.CANCELLED_APPLY) {
+                throw new BusinessException(1008, "已申请过该订单");
+            }
+            // 之前撤销过，现在重新申请，复用原记录
+            existing.setStatus(ApplyStatus.PENDING_REVIEW);
+            targetApply = existing;
+        } else {
+            OrderApply orderApply = new OrderApply();
+            orderApply.setOrder(order);
+            orderApply.setUser(currentUser);
+            orderApply.setStatus(ApplyStatus.PENDING_REVIEW);
+            targetApply = orderApply;
         }
 
-        OrderApply orderApply = new OrderApply();
-        orderApply.setOrder(order);
-        orderApply.setUser(currentUser);
-        orderApply.setStatus(ApplyStatus.PENDING_REVIEW);
-
-        OrderApply savedApply = orderApplyRepository.save(orderApply);
+        OrderApply savedApply = orderApplyRepository.save(targetApply);
         return savedApply.getApid();
     }
 
