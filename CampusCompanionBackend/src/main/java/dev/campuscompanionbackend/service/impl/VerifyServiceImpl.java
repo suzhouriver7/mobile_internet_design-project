@@ -38,7 +38,7 @@ public class VerifyServiceImpl implements VerifyService {
     public void verifyEmail(String email) throws EmailInvalidException, UserExistException {
         if(userRepository.existsByEmail(email)){
             throw new UserExistException(String.format("邮箱已注册: email=%s", email));
-        };
+        }
 
         String code = VerifyCodeUtil.generateCode6Num();
         LocalDateTime expireTime =
@@ -66,7 +66,7 @@ public class VerifyServiceImpl implements VerifyService {
             helper.setText(content, true);
             mailSender.send(message);
         } catch (MessagingException e) {
-            throw new EmailInvalidException(String.format("无法向 %s 发送邮件", to), e);
+            throw new EmailInvalidException("无法发送邮件: email=" + to, e);
         }
     }
 }

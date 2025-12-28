@@ -15,7 +15,7 @@ public abstract class BusinessException extends RuntimeException {
         return errorCode.getCode();
     }
 
-    public String getErrorCodeMessage(){
+    public String getCodeType(){
         return errorCode.getMessage();
     }
 }

@@ -7,7 +7,7 @@ import dev.campuscompanionbackend.dto.response.UserInfoResponse;
 import dev.campuscompanionbackend.entity.User;
 import dev.campuscompanionbackend.enums.UserStatus;
 import dev.campuscompanionbackend.enums.UserType;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.UserRepository;
 import dev.campuscompanionbackend.service.AuthService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -29,16 +30,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        log.info("用户登录: identifier={}", request.getIdentifier());
-
-        User user = userRepository.findByEmail(request.getIdentifier())
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+        String identifier = request.getIdentifier();
+        User user = userRepository.findByEmail(identifier)
+                .orElseThrow(() -> new UserNotExistException("用户不存在: identifier=" + identifier));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new BusinessException(1003, "密码错误");
+            throw new PasswordErrorException("用户密码错误: identifier=" + identifier);
         }
 
+        // TODO 占线处理
+
+        user.setUserStatus(UserStatus.ONLINE);
         user.setLastLoginAt(LocalDateTime.now());
+        log.info("用户登录: userId={}, identifier={}", user.getUid(), identifier);
         userRepository.save(user);
 
         String token = "mock_token_" + user.getUid() + "_" + System.currentTimeMillis();
@@ -60,22 +64,26 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public Long register(RegisterRequest request) {
-        log.info("用户注册: email={}, nickname={}", request.getEmail(), request.getNickname());
+        String email = request.getEmail();
+        String verifyCode = request.getVerifycode();
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException(1011, "用户已存在");
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+        if(optionalUser.isEmpty()
+                || optionalUser.get().getUserStatus() != UserStatus.REGISTERING
+                || !passwordEncoder.matches(request.getPassword(), verifyCode)) {
+            throw new VerifyCodeErrorException(
+                    String.format("验证码错误: email=%s, receivedVerifyCode=%s", email, verifyCode)
+            );
         }
 
-        User user = new User();
-        user.setEmail(request.getEmail());
+        User user = optionalUser.get();
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
         user.setUserType(UserType.COMMON);
         user.setUserStatus(UserStatus.ONLINE);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setLastLoginAt(LocalDateTime.now());
 
         User savedUser = userRepository.save(user);
+        log.info("用户注册: userId= {}, email={}, nickname={}", user.getUid(), user.getEmail(), user.getNickname());
         return savedUser.getUid();
     }
 
@@ -88,5 +96,6 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout() {
         log.info("用户退出登录");
+        // TODO 用户退出
     }
 }

@@ -4,6 +4,7 @@ import dev.campuscompanionbackend.dto.request.LoginRequest;
 import dev.campuscompanionbackend.dto.request.RegisterRequest;
 import dev.campuscompanionbackend.dto.response.LoginResponse;
 
+
 /**
  * 用户认证服务接口
  */

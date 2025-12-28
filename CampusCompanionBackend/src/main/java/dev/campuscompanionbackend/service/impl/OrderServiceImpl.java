@@ -8,7 +8,7 @@ import dev.campuscompanionbackend.enums.ActivityType;
 import dev.campuscompanionbackend.enums.ApplyStatus;
 import dev.campuscompanionbackend.enums.Campus;
 import dev.campuscompanionbackend.enums.OrderStatus;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.*;
 import dev.campuscompanionbackend.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -48,18 +48,18 @@ public class OrderServiceImpl implements OrderService {
     private Long getCurrentUserIdOrThrow() {
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
         if (!(attrs instanceof ServletRequestAttributes servletAttributes)) {
-            throw new BusinessException(1001, "无法获取当前用户信息");
+            throw new ParamValidationFailedException("无法获取当前用户信息");
         }
 
         String userIdHeader = servletAttributes.getRequest().getHeader("X-User-Id");
         if (userIdHeader == null || userIdHeader.isBlank()) {
-            throw new BusinessException(1001, "未登录或用户信息缺失");
+            throw new ParamValidationFailedException("未登录或用户信息缺失");
         }
 
         try {
             return Long.parseLong(userIdHeader);
         } catch (NumberFormatException e) {
-            throw new BusinessException(1001, "用户信息格式错误");
+            throw new ParamValidationFailedException("用户信息格式错误", e);
         }
     }
 
@@ -182,8 +182,10 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = getOrderById(orderId);
 
+        // TODO 业务逻辑待审查
+        log.error("OrderService updateOrder 还未审查");
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new BusinessException(1015, "只有待匹配状态的订单可以修改");
+            throw new OrderCancelledException("只有待匹配状态的订单可以修改");
         }
 
         if (request.getActivityType() != null) {
@@ -223,7 +225,7 @@ public class OrderServiceImpl implements OrderService {
 
         Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
-            throw new BusinessException(1004, "只有订单发布者可以删除订单");
+            throw new NoPermissionException("只有订单发布者可以删除订单");
         }
 
         order.setStatus(OrderStatus.CANCELLED);
@@ -239,7 +241,7 @@ public class OrderServiceImpl implements OrderService {
         Order order = getOrderById(orderId);
 
         if (order.getStatus() == OrderStatus.COMPLETED) {
-            throw new BusinessException(1014, "订单已完成");
+            throw new OrderCompletedException("订单已完成: orderId=" + orderId);
         }
 
         order.setStatus(OrderStatus.COMPLETED);
@@ -255,11 +257,11 @@ public class OrderServiceImpl implements OrderService {
         Order order = getOrderById(orderId);
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new BusinessException(1015, "只有待匹配状态的订单可以申请");
+            throw new OrderCancelledException("只有待匹配状态的订单可以申请");
         }
 
         if (order.getCurrentPeople() >= order.getMaxPeople()) {
-            throw new BusinessException(1009, "人数已满");
+            throw new OrderFullException("人数已满: orderId=" + orderId);
         }
 
         Long currentUserId = getCurrentUserIdOrThrow();
@@ -274,7 +276,7 @@ public class OrderServiceImpl implements OrderService {
         if (optionalApply.isPresent()) {
             OrderApply existing = optionalApply.get();
             if (existing.getStatus() != ApplyStatus.CANCELLED_APPLY) {
-                throw new BusinessException(1008, "已申请过该订单");
+                throw new DuplicateOperationException("已申请过该订单");
             }
             // 之前撤销过，现在重新申请，复用原记录
             existing.setStatus(ApplyStatus.PENDING_REVIEW);
@@ -302,7 +304,7 @@ public class OrderServiceImpl implements OrderService {
         User currentUser = getUserById(currentUserId);
 
         OrderApply orderApply = orderApplyRepository.findByOrderAndUser(order, currentUser)
-                .orElseThrow(() -> new BusinessException(1013, "申请记录不存在"));
+                .orElseThrow(() -> new ApplicationNotExistException("申请记录不存在"));
 
         orderApply.setStatus(ApplyStatus.CANCELLED_APPLY);
         orderApplyRepository.save(orderApply);
@@ -326,13 +328,13 @@ public class OrderServiceImpl implements OrderService {
         log.info("审核申请: applyId={}, status={}", applyId, status);
 
         OrderApply orderApply = orderApplyRepository.findById(applyId)
-                .orElseThrow(() -> new BusinessException(1013, "申请记录不存在"));
+                .orElseThrow(() -> new ApplicationNotExistException("申请记录不存在"));
 
         Order order = orderApply.getOrder();
 
         Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
-            throw new BusinessException(1004, "只有订单发布者可以审核申请");
+            throw new NoPermissionException("只有订单发布者可以审核申请");
         }
 
         orderApply.setStatus(status);
@@ -356,7 +358,7 @@ public class OrderServiceImpl implements OrderService {
         User accepter = getUserById(accepterId);
 
         if (orderAcceptRepository.existsByOrder(order)) {
-            throw new BusinessException(1008, "订单已被接受");
+            throw new DuplicateOperationException("订单已被接受");
         }
 
         OrderAccept orderAccept = new OrderAccept();
@@ -423,12 +425,12 @@ public class OrderServiceImpl implements OrderService {
 
     private Order getOrderById(Long orderId) {
         return orderRepository.findById(orderId)
-                .orElseThrow(() -> new BusinessException(1005, "订单不存在"));
+                .orElseThrow(() -> new OrderNotExistException("订单不存在"));
     }
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+                .orElseThrow(() -> new UserNotExistException("用户不存在"));
     }
 
     private Map<String, Object> convertToOrderVO(Order order) {
