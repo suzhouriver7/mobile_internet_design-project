@@ -47,7 +47,7 @@ public class FileController extends BaseController {
      * @param fileUrl 文件URL
      * @return ApiResponse<Boolean>
      */
-    @DeleteMapping
+    @DeleteMapping("/url")
     public ApiResponse<Boolean> deleteFile(@RequestParam("fileUrl") String fileUrl) {
         boolean deleted = fileService.deleteFile(fileUrl);
         String message = deleted ? "删除成功" : "文件不存在";
@@ -59,7 +59,7 @@ public class FileController extends BaseController {
      * @param pmid 文件ID
      * @return ApiResponse<Boolean>
      */
-    @DeleteMapping
+    @DeleteMapping("/pmid")
     public ApiResponse<Boolean> deleteFile(@RequestParam("pmid") Long pmid) {
         boolean deleted = fileService.deleteFile(pmid);
         String message = deleted ? "删除成功" : "文件不存在";
