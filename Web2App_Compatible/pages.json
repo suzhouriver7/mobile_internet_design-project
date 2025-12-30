@@ -1,17 +1,42 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
-		{
-			"path": "pages/index/index",
-			"style": {
-				"navigationBarTitleText": "uni-app"
-			}
-		}
-	],
-	"globalStyle": {
-		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
-	},
-	"uniIdRouter": {}
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": { "navigationBarTitleText": "首页" }
+    },
+    {
+      "path": "pages/user/info",
+      "style": { "navigationBarTitleText": "个人信息" }
+    },
+    {
+      "path": "pages/user/edit",
+      "style": { "navigationBarTitleText": "编辑信息" }
+    },
+    {
+      "path": "pages/content/list",
+      "style": { "navigationBarTitleText": "校园动态" }
+    },
+    {
+      "path": "pages/content/comments",
+      "style": { "navigationBarTitleText": "评论" }
+    },
+    {
+      "path": "pages/orders/list",
+      "style": { "navigationBarTitleText": "预约订单" }
+    },
+    {
+      "path": "pages/orders/create",
+      "style": { "navigationBarTitleText": "发布订单" }
+    },
+    {
+      "path": "pages/orders/messages",
+      "style": { "navigationBarTitleText": "订单聊天" }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "校园约伴",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F8F8F8"
+  }
 }
