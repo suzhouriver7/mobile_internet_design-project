@@ -18,7 +18,10 @@
         </el-form-item>
         <div class="login-actions">
           <el-button type="primary" @click="handleLogin">登录</el-button>
-          <router-link to="/register" class="register-link">注册</router-link>
+          <div class="login-links">
+            <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
+            <router-link to="/register" class="register-link">注册</router-link>
+          </div>
         </div>
       </el-form>
     </el-card>
@@ -79,7 +82,14 @@ const handleLogin = async () => {
   margin-top: 20px;
 }
 
-.register-link {
+.login-links {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.register-link,
+.forgot-link {
   color: #409eff;
   text-decoration: none;
 }
