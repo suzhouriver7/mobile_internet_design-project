@@ -30,6 +30,7 @@ public enum ErrorCode {
     VERIFY_CODE_ERROR(1018, "验证码错误"),
     FILE_DELETE_FAILED(1019, "文件删除失败"),
     REGISTER_FAILED(1020, "注册失败"),
+    AI_FAILED(1021, "AI调用异常"),
     SOMETHING_HAPPENED(1000, "出现了一些小问题"),
     ;
 
