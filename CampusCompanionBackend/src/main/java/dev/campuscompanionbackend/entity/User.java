@@ -45,5 +45,15 @@ public class User {
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
-    private LocalDateTime lastLoginAt;
+    private LocalDateTime lastLoginAt = LocalDateTime.now();
+
+    public static User buildRegisteringUser(String email, String verifyCode, LocalDateTime expireTime){
+        User user = new User();
+        user.setEmail(email);
+        user.setPassword(String.valueOf(verifyCode));
+        user.setNickname("$__registering_user");
+        user.setUserStatus(UserStatus.REGISTERING);
+        user.setLastLoginAt(expireTime);
+        return user;
+    }
 }

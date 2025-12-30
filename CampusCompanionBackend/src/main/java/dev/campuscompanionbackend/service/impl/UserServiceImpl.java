@@ -5,7 +5,9 @@ import dev.campuscompanionbackend.dto.request.UpdateUserRequest;
 import dev.campuscompanionbackend.dto.response.UserInfoResponse;
 import dev.campuscompanionbackend.entity.User;
 import dev.campuscompanionbackend.enums.UserType;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.FileUploadFailedException;
+import dev.campuscompanionbackend.exception.PasswordErrorException;
+import dev.campuscompanionbackend.exception.UserNotExistException;
 import dev.campuscompanionbackend.repository.UserRepository;
 import dev.campuscompanionbackend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +66,7 @@ public class UserServiceImpl implements UserService {
         User user = getUserById(userId);
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new BusinessException(1003, "密码错误");
+            throw new PasswordErrorException("密码错误");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -79,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
         String contentType = avatar.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new BusinessException(1007, "请上传图片文件");
+            throw new FileUploadFailedException("请上传图片文件");
         }
 
         try {
@@ -107,7 +109,7 @@ public class UserServiceImpl implements UserService {
             return avatarUrl;
         } catch (IOException e) {
             log.error("上传头像失败", e);
-            throw new BusinessException(1007, "上传头像失败: " + e.getMessage());
+            throw new FileUploadFailedException("上传头像失败", e);
         }
     }
 
@@ -138,7 +140,7 @@ public class UserServiceImpl implements UserService {
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+                .orElseThrow(() -> new UserNotExistException("用户不存在: userId=" + userId));
     }
 
     private UserInfoResponse convertToUserInfoResponse(User user) {

@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 /**
  * 动态管理相关接口
  */
@@ -60,6 +62,20 @@ public class ContentController extends BaseController {
         Object detail = contentService.getContentDetail(contentId);
         return success(detail);
     }
+
+    /**
+     * 修改订单信息
+     * @param contentId 动态ID
+     * @param request 修改动态请求参数
+     * @return ApiResponse<Long>
+     */
+    @PutMapping("/{contentId}")
+    public ApiResponse<Long> updateContent(
+            @PathVariable Long contentId,
+            @Valid @RequestBody CreateContentRequest request) {
+        Long updatedContentId = contentService.updateContent(contentId, request);
+        return success("修改成功", updatedContentId);
+    }
     
     /**
      * 删除动态
@@ -84,6 +100,17 @@ public class ContentController extends BaseController {
             @RequestParam("media") MultipartFile media) {
         String mediaUrl = contentService.uploadMedia(contentId, media);
         return success("上传成功", mediaUrl);
+    }
+
+    /**
+     * 获取动态所有媒体文件
+     * @param contentId 动态ID
+     * @return ApiResponse<Object>
+     */
+    @GetMapping("/{contentId}/medias")
+    public ApiResponse<Object> getMedias(@PathVariable Long contentId) {
+        Object result = contentService.getMedias(contentId);
+        return success("获取成功", result);
     }
     
     /**
@@ -123,8 +150,12 @@ public class ContentController extends BaseController {
      */
     @PostMapping("/{contentId}/like")
     public ApiResponse<Object> likeContent(@PathVariable Long contentId) {
-        Object result = contentService.likeContent(contentId);
-        return success("点赞成功", result);
+        Map<String, Object> result = contentService.likeContent(contentId);
+        String message = "点赞成功";
+        if (!((boolean) result.get("liked"))) {
+            message = "取消点赞成功";
+        }
+        return success(message, result);
     }
     
     /**
