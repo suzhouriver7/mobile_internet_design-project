@@ -1,153 +1,239 @@
 <template>
   <view class="user-info-page">
-    <!-- 头像与基本信息 -->
-    <view class="user-header">
-      <view class="avatar-container">
-        <uni-image 
-          class="avatar" 
-          :src="userInfo.avatar || '/static/images/default-avatar.png'"
-          mode="widthFix"
-        ></uni-image>
-        <uni-icon 
-          class="edit-avatar" 
-          type="camera" 
-          size="24" 
-          @click="chooseAvatar"
-        ></uni-icon>
-      </view>
-      <view class="user-base">
-        <text class="nickname">{{ userInfo.nickname || '未设置' }}</text>
-        <text class="student-id">{{ userInfo.studentId || '未绑定学号' }}</text>
+    <!-- 用户信息卡片 -->
+    <view class="user-card">
+      <view class="user-header" @click="toEdit">
+        <u-avatar 
+          :src="avatarUrl || '/static/images/default-avatar.png'" 
+          size="120"
+        ></u-avatar>
+        <view class="user-info">
+          <text class="user-name">{{ nickname }}</text>
+          <text class="user-email" v-if="userInfo?.email">{{ userInfo.email }}</text>
+          <text class="user-student-id" v-if="userInfo?.studentId">学号：{{ userInfo.studentId }}</text>
+        </view>
+        <u-icon name="arrow-right" size="20" color="#999"></u-icon>
       </view>
     </view>
 
-    <!-- 信息列表 -->
-    <uni-list>
-      <uni-list-item 
-        title="性别" 
-        :note="userInfo.gender === 'MALE' ? '男' : '女'" 
-        clickable 
-        @click="navigateToEdit('gender')"
-      ></uni-list-item>
-      <uni-list-item 
-        title="校区" 
-        :note="userInfo.campus || '未设置'" 
-        clickable 
-        @click="navigateToEdit('campus')"
-      ></uni-list-item>
-      <uni-list-item 
-        title="简介" 
-        :note="userInfo.introduction || '未填写'" 
-        clickable 
-        @click="navigateToEdit('introduction')"
-      ></uni-list-item>
-      <uni-list-item 
-        title="修改密码" 
-        clickable 
-        @click="navigateToChangePwd"
-      ></uni-list-item>
-    </uni-list>
+    <!-- 功能列表 -->
+    <view class="menu-list">
+      <view class="menu-item" @click="toMyOrders">
+        <u-icon name="calendar" size="20" color="#007aff"></u-icon>
+        <text>我的活动</text>
+        <u-icon name="arrow-right" size="16" color="#999"></u-icon>
+      </view>
+      
+      <view class="menu-item" @click="toMyContents">
+        <u-icon name="photo" size="20" color="#4cd964"></u-icon>
+        <text>我的动态</text>
+        <u-icon name="arrow-right" size="16" color="#999"></u-icon>
+      </view>
+      
+      <view class="menu-item" @click="toEdit">
+        <u-icon name="setting" size="20" color="#f0ad4e"></u-icon>
+        <text>编辑资料</text>
+        <u-icon name="arrow-right" size="16" color="#999"></u-icon>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <view class="logout-section" v-if="isLogin">
+      <u-button
+        type="error"
+        shape="circle"
+        @click="handleLogout"
+        :custom-style="{
+          height: '88rpx',
+          fontSize: '32rpx'
+        }"
+      >
+        退出登录
+      </u-button>
+    </view>
+
+    <!-- 未登录提示 -->
+    <view class="login-prompt" v-else>
+      <u-button
+        type="primary"
+        shape="circle"
+        @click="toLogin"
+        :custom-style="{
+          height: '88rpx',
+          fontSize: '32rpx'
+        }"
+      >
+        立即登录
+      </u-button>
+    </view>
   </view>
 </template>
 
 <script setup>
-import { ref, onLoad } from 'vue'
-import { useUserStore } from '@/stores/user'
-import { uploadFile } from '@/utils/request'
+import { computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { useStore } from 'vuex'
+import { userApi } from '@/api'
+import { resolveResourceUrl } from '@/utils/util'
 
-const userStore = useUserStore()
-const userInfo = ref({})
+// 使用Vuex store
+const store = useStore()
+const userInfo = computed(() => store.getters.userInfo)
+const isLogin = computed(() => store.getters.isLogin)
+const nickname = computed(() => store.getters.nickname)
+const avatarUrl = computed(() => {
+  const url = store.getters.avatarUrl
+  return url ? resolveResourceUrl(url) : ''
+})
 
-// 页面加载时获取用户信息
-onLoad(async () => {
-  try {
-    const res = await userStore.getUserInfo()
-    userInfo.value = res.data
-  } catch (err) {
-    uni.showToast({ title: '获取信息失败', icon: 'none' })
+// 生命周期
+onShow(() => {
+  // 如果已登录，刷新用户信息
+  if (isLogin.value && store.getters.userId) {
+    loadUserInfo()
   }
 })
 
-// 选择头像并上传
-const chooseAvatar = async () => {
-  uni.chooseImage({
-    count: 1,
-    sizeType: ['original', 'compressed'],
-    sourceType: ['album', 'camera'],
+// 方法
+const loadUserInfo = async () => {
+  try {
+    const userId = store.getters.userId
+    if (userId) {
+      const info = await userApi.getUserInfo(userId)
+      store.dispatch('user/updateUserInfo', info)
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error)
+  }
+}
+
+const toEdit = () => {
+  if (!isLogin.value) {
+    uni.navigateTo({
+      url: '/pages/auth/login'
+    })
+    return
+  }
+  uni.navigateTo({
+    url: '/pages/user/edit'
+  })
+}
+
+const toMyOrders = () => {
+  if (!isLogin.value) {
+    uni.navigateTo({
+      url: '/pages/auth/login'
+    })
+    return
+  }
+  uni.showToast({
+    title: '功能开发中',
+    icon: 'none'
+  })
+}
+
+const toMyContents = () => {
+  if (!isLogin.value) {
+    uni.navigateTo({
+      url: '/pages/auth/login'
+    })
+    return
+  }
+  uni.showToast({
+    title: '功能开发中',
+    icon: 'none'
+  })
+}
+
+const handleLogout = () => {
+  uni.showModal({
+    title: '提示',
+    content: '确定要退出登录吗？',
     success: async (res) => {
-      const tempFilePath = res.tempFilePaths[0]
-      try {
-        // 调用封装的文件上传接口
-        const avatarUrl = await uploadFile({
-          url: '/users/avatar',
-          filePath: tempFilePath,
-          name: 'avatar'
-        })
-        // 更新本地头像显示
-        userInfo.value.avatar = avatarUrl
-        uni.showToast({ title: '上传成功', icon: 'success' })
-      } catch (err) {
-        uni.showToast({ title: '上传失败', icon: 'none' })
+      if (res.confirm) {
+        await store.dispatch('logout')
       }
     }
   })
 }
 
-// 跳转到编辑页
-const navigateToEdit = (field) => {
+const toLogin = () => {
   uni.navigateTo({
-    url: `/pages/user/edit?field=${field}&value=${JSON.stringify(userInfo.value[field])}`
+    url: '/pages/auth/login'
   })
-}
-
-// 跳转到修改密码页
-const navigateToChangePwd = () => {
-  uni.navigateTo({ url: '/pages/user/change-pwd' })
 }
 </script>
 
-<style scoped>
-.user-header {
-  display: flex;
-  padding: 30rpx;
-  align-items: center;
-  border-bottom: 1px solid #f5f5f5;
+<style lang="scss" scoped>
+.user-info-page {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  padding-bottom: 40rpx;
 }
 
-.avatar-container {
-  position: relative;
-  margin-right: 30rpx;
+.user-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 60rpx 32rpx 40rpx;
+  margin-bottom: 24rpx;
+  
+  .user-header {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    
+    .user-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8rpx;
+      
+      .user-name {
+        font-size: 36rpx;
+        font-weight: bold;
+        color: white;
+      }
+      
+      .user-email,
+      .user-student-id {
+        font-size: 24rpx;
+        color: rgba(255, 255, 255, 0.9);
+      }
+    }
+  }
 }
 
-.avatar {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
+.menu-list {
+  background: white;
+  margin: 0 32rpx 24rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 24rpx;
+    padding: 32rpx;
+    border-bottom: 1rpx solid #f0f0f0;
+    
+    &:last-child {
+      border-bottom: none;
+    }
+    
+    &:active {
+      background-color: #f8f9fa;
+    }
+    
+    text {
+      flex: 1;
+      font-size: 28rpx;
+      color: #333;
+    }
+  }
 }
 
-.edit-avatar {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background-color: #409eff;
-  color: white;
-  border-radius: 50%;
-  padding: 5rpx;
-}
-
-.user-base {
-  flex: 1;
-}
-
-.nickname {
-  font-size: 36rpx;
-  font-weight: bold;
-  display: block;
-  margin-bottom: 10rpx;
-}
-
-.student-id {
-  font-size: 28rpx;
-  color: #666;
+.logout-section,
+.login-prompt {
+  padding: 0 32rpx;
+  margin-top: 40rpx;
 }
 </style>

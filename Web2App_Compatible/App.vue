@@ -1,11 +1,19 @@
-<template>
-  <view>
-    <!-- 页面内容 -->
-    <slot />
-    
-    <!-- 全局弹窗、提示等可以放在这里 -->
-  </view>
-</template>
+<script>
+export default {
+  onLaunch: function(options) {
+    console.log('App Launch', options)
+  },
+  onShow: function(options) {
+    console.log('App Show', options)
+  },
+  onHide: function() {
+    console.log('App Hide')
+  },
+  onError: function(error) {
+    console.error('App Error:', error)
+  }
+}
+</script>
 
 <script>
 export default {

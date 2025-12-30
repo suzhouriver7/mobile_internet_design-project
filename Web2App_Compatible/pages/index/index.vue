@@ -245,8 +245,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { storeToRefs } from 'pinia'
-import { useUserStore } from '@/store/user'
+import { useStore } from 'vuex'
 import { orderApi, contentApi } from '@/api'
 import { 
   formatTime, 
@@ -261,9 +260,10 @@ import {
   ORDER_STATUS_MAP 
 } from '@/utils/constants'
 
-// 使用Pinia store
-const userStore = useUserStore()
-const { userInfo, isLogin } = storeToRefs(userStore)
+// 使用Vuex store
+const store = useStore()
+const userInfo = computed(() => store.getters.userInfo)
+const isLogin = computed(() => store.getters.isLogin)
 
 // 响应式数据
 const searchKeyword = ref('')
@@ -278,9 +278,8 @@ const loading = ref(false)
 
 // 计算属性
 const userAvatar = computed(() => {
-  return isLogin.value && userInfo.value?.avatarUrl 
-    ? resolveResourceUrl(userInfo.value.avatarUrl)
-    : '/static/avatars/default.png'
+  const avatarUrl = store.getters.avatarUrl
+  return avatarUrl || '/static/images/default-avatar.png'
 })
 
 // 生命周期

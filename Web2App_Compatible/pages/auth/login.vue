@@ -125,12 +125,12 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { useUserStore } from '@/store/user'
+import { useStore } from 'vuex'
 import { authApi } from '@/api'
 import { showLoading, hideLoading, showSuccess, showError } from '@/utils/util'
 
-// 使用Pinia store
-const userStore = useUserStore()
+// 使用Vuex store
+const store = useStore()
 
 // 响应式数据
 const form = reactive({
@@ -266,7 +266,7 @@ const handleLoginSuccess = async (response) => {
   saveRememberedAccount()
   
   // 更新用户状态
-  await userStore.login(response)
+  await store.dispatch('login', response)
   
   // 显示成功提示
   showSuccess('登录成功')

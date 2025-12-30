@@ -28,15 +28,9 @@ export function createApp() {
     console.error('Vue全局错误:', err)
     console.error('发生在组件:', instance)
     console.error('错误信息:', info)
-    
-    // 生产环境可以上报错误
-    // if (!import.meta.env.DEV) {
-    //   // 错误上报逻辑
-    // }
   }
   
   return {
-    app,
-    store // 需要返回store以供SSR使用
+    app
   }
 }
