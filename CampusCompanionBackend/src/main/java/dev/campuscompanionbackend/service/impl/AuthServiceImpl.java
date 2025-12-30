@@ -2,8 +2,12 @@ package dev.campuscompanionbackend.service.impl;
 
 import dev.campuscompanionbackend.dto.request.LoginRequest;
 import dev.campuscompanionbackend.dto.request.RegisterRequest;
+import dev.campuscompanionbackend.dto.request.ForgotPasswordVerifyEmailRequest;
+import dev.campuscompanionbackend.dto.request.ForgotPasswordVerifyCodeRequest;
+import dev.campuscompanionbackend.dto.request.ForgotPasswordResetPasswordRequest;
 import dev.campuscompanionbackend.dto.response.LoginResponse;
 import dev.campuscompanionbackend.dto.response.UserInfoResponse;
+import dev.campuscompanionbackend.dto.response.ForgotPasswordVerifyEmailResponse;
 import dev.campuscompanionbackend.entity.User;
 import dev.campuscompanionbackend.enums.UserStatus;
 import dev.campuscompanionbackend.enums.UserType;
@@ -113,5 +117,48 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
         log.info("用户退出登录: userId={}", userId);
+    }
+
+    // ==================== 忘记密码相关方法（当前为固定成功结果，便于前端联调） ====================
+
+    @Override
+    public ForgotPasswordVerifyEmailResponse verifyEmailForReset(ForgotPasswordVerifyEmailRequest request) {
+        // TODO: 后续这里应检查邮箱是否存在，并结合验证码记录
+        String email = request.getEmail();
+        ForgotPasswordVerifyEmailResponse resp = new ForgotPasswordVerifyEmailResponse();
+
+        if (email == null || !email.contains("@")) {
+            resp.setEmailMasked(email);
+            return resp;
+        }
+
+        int atIndex = email.indexOf('@');
+        String namePart = email.substring(0, atIndex);
+        String domainPart = email.substring(atIndex);
+        if (namePart.length() <= 2) {
+            resp.setEmailMasked(namePart.charAt(0) + "***" + domainPart);
+        } else {
+            resp.setEmailMasked(namePart.substring(0, 2) + "***" + domainPart);
+        }
+
+        return resp;
+    }
+
+    @Override
+    public void sendResetCode(ForgotPasswordVerifyEmailRequest request) {
+        // TODO: 后续应在此生成并发送用于重置密码的邮箱验证码，且控制发送频率
+        log.info("[MOCK] send reset code to email={}", request.getEmail());
+    }
+
+    @Override
+    public void verifyResetCode(ForgotPasswordVerifyCodeRequest request) {
+        // TODO: 后续应校验邮箱对应的验证码是否正确且未过期
+        log.info("[MOCK] verify reset code for email={}, code={}", request.getEmail(), request.getVerifyCode());
+    }
+
+    @Override
+    public void resetPassword(ForgotPasswordResetPasswordRequest request) {
+        // TODO: 后续应再次校验验证码，并为该邮箱对应的用户设置新密码
+        log.info("[MOCK] reset password for email={}", request.getEmail());
     }
 }
