@@ -33,6 +33,7 @@ public interface AuthService {
     
     /**
      * 用户退出登录
+     * @param userId 退出的用户ID
      */
-    void logout();
+    void logout(Long userId);
 }
