@@ -99,8 +99,19 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout() {
-        log.info("用户退出登录");
-        // TODO 用户退出
+    @Transactional
+    public void logout(Long userId) {
+        if (userId == null) {
+            log.warn("用户退出登录但未提供 userId");
+            return;
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotExistException("用户不存在: userId=" + userId));
+
+        user.setUserStatus(UserStatus.OFFLINE);
+        userRepository.save(user);
+
+        log.info("用户退出登录: userId={}", userId);
     }
 }
