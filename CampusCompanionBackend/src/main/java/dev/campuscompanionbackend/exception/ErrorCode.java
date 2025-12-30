@@ -29,6 +29,7 @@ public enum ErrorCode {
     EMAIL_INVALID(1017,"非法的邮箱地址"),
     VERIFY_CODE_ERROR(1018, "验证码错误"),
     FILE_DELETE_FAILED(1019, "文件删除失败"),
+    REGISTER_FAILED(1020, "注册失败"),
     SOMETHING_HAPPENED(1000, "出现了一些小问题"),
     ;
 

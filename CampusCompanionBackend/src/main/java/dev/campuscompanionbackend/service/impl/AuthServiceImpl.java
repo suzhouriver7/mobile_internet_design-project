@@ -42,7 +42,6 @@ public class AuthServiceImpl implements AuthService {
 
         user.setUserStatus(UserStatus.ONLINE);
         user.setLastLoginAt(LocalDateTime.now());
-        log.info("用户登录: userId={}, identifier={}", user.getUid(), identifier);
         userRepository.save(user);
 
         String token = "mock_token_" + user.getUid() + "_" + System.currentTimeMillis();
@@ -58,6 +57,7 @@ public class AuthServiceImpl implements AuthService {
         response.setToken(token);
         response.setUserInfo(userInfo);
 
+        log.info("用户登录: userId={}, identifier={}", user.getUid(), identifier);
         return response;
     }
 
@@ -68,15 +68,20 @@ public class AuthServiceImpl implements AuthService {
         String verifyCode = request.getVerifycode();
 
         Optional<User> optionalUser = userRepository.findByEmail(email);
-        if(optionalUser.isEmpty()
-                || optionalUser.get().getUserStatus() != UserStatus.REGISTERING
-                || !passwordEncoder.matches(request.getPassword(), verifyCode)) {
+        if(optionalUser.isEmpty()){
+            throw new RegisterFailedException("邮箱未验证: email=" + email);
+        }
+        User user = optionalUser.get();
+
+        if(optionalUser.get().getUserStatus() != UserStatus.REGISTERING){
+            throw new UserExistException("邮箱已注册");
+        }
+        if(!passwordEncoder.matches(request.getPassword(), verifyCode)) {
             throw new VerifyCodeErrorException(
                     String.format("验证码错误: email=%s, receivedVerifyCode=%s", email, verifyCode)
             );
         }
 
-        User user = optionalUser.get();
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
         user.setUserType(UserType.COMMON);
