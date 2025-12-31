@@ -32,35 +32,67 @@ public class ZhipuAIServiceImpl implements ZhipuAIService {
     @Override
     public ChatResponse chat(ChatRequest request) {
         String url = config.getBaseUrl();
+        int maxRetries = 3;
+        long baseBackoffMs = 1000L;
 
-        try (CloseableHttpClient httpClient = createHttpClient()) {
-            HttpPost httpPost = new HttpPost(url);
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            try (CloseableHttpClient httpClient = createHttpClient()) {
+                HttpPost httpPost = new HttpPost(url);
 
-            httpPost.setHeader("Authorization", "Bearer " + config.getApiKey());
-            httpPost.setHeader("Content-Type", "application/json");
-            httpPost.setHeader("Accept", "application/json");
+                httpPost.setHeader("Authorization", "Bearer " + config.getApiKey());
+                httpPost.setHeader("Content-Type", "application/json");
+                httpPost.setHeader("Accept", "application/json");
 
-            String json = objectMapper.writeValueAsString(request);
-            httpPost.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
+                String json = objectMapper.writeValueAsString(request);
+                httpPost.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
 
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
 
-                if (statusCode == 200) {
-                    ChatResponse chatResponse = objectMapper.readValue(responseBody, ChatResponse.class);
-                    log.info("AI回复成功，消耗token: {}", chatResponse.getUsage().getTotalTokens());
-                    return chatResponse;
-                } else {
+                    if (statusCode == 200) {
+                        ChatResponse chatResponse = objectMapper.readValue(responseBody, ChatResponse.class);
+                        log.info("AI回复成功，消耗token: {}", chatResponse.getUsage().getTotalTokens());
+                        return chatResponse;
+                    }
+
+                    if (statusCode == 429) {
+                        log.warn("智谱AI接口返回 429 Too Many Requests, attempt={}", attempt);
+                        if (attempt < maxRetries) {
+                            String retryAfter = response.getFirstHeader("Retry-After") != null ? response.getFirstHeader("Retry-After").getValue() : null;
+                            long wait = baseBackoffMs * (1L << attempt);
+                            if (retryAfter != null) {
+                                try { wait = Long.parseLong(retryAfter) * 1000L; } catch (NumberFormatException ignored) {}
+                            }
+                            try { Thread.sleep(wait); } catch (InterruptedException ignored) {}
+                            continue; // retry
+                        }
+                        log.error("智谱AI接口调用失败: status={}, body={}", statusCode, responseBody);
+                        throw new AIException("AI服务调用失败，状态码: " + statusCode);
+                    }
+
+                    if (statusCode >= 500 && statusCode < 600 && attempt < maxRetries) {
+                        log.warn("智谱AI接口返回服务器错误 status={}, attempt={}", statusCode, attempt);
+                        try { Thread.sleep(baseBackoffMs * (1L << attempt)); } catch (InterruptedException ignored) {}
+                        continue;
+                    }
+
                     log.error("智谱AI接口调用失败: status={}, body={}", statusCode, responseBody);
                     throw new AIException("AI服务调用失败，状态码: " + statusCode);
                 }
+            } catch (AIException ae) {
+                throw ae;
+            } catch (Exception e) {
+                log.error("调用智谱AI接口异常, attempt={}", attempt, e);
+                if (attempt < maxRetries) {
+                    try { Thread.sleep(baseBackoffMs * (1L << attempt)); } catch (InterruptedException ignored) {}
+                    continue;
+                }
+                throw new AIException("AI服务异常: " + e.getMessage(), e);
             }
-
-        } catch (Exception e) {
-            log.error("调用智谱AI接口异常", e);
-            throw new AIException("AI服务异常: " + e.getMessage(), e);
         }
+
+        throw new AIException("AI服务异常: 达到最大重试次数");
     }
 
     @Override
