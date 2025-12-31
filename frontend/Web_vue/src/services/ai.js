@@ -15,5 +15,6 @@ export default {
   // body: { model?, messages: [{role, content}], stream?, temperature?, maxTokens? }
   fullChat(payload) {
     return api.post('/ai/chat/full', payload)
-  }
+  },
+  // 注意：流式接口已移除，使用非流式 `fullChat` 获取完整回复
 }

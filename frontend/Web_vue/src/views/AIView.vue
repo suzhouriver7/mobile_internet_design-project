@@ -9,12 +9,16 @@
         <div class="chat-messages" ref="chatContainer">
           <div v-for="message in messages" :key="message.id" :class="['message-row', message.role]">
             <div class="avatar">
-              <el-avatar :src="message.role === 'user' ? userAvatar : aiAvatar" size="32" />
+              <el-avatar :src="message.role === 'user' ? userAvatar : aiAvatar" :size="32" />
             </div>
             <div class="bubble">
               <div class="bubble-content">
                 <div v-if="message.role === 'assistant' && message.loading" class="loading-indicator">
-                  <el-skeleton :rows="3" animated />
+                  <div class="three-body" aria-hidden="true" title="AI 正在生成回复">
+                    <div class="three-body__dot"></div>
+                    <div class="three-body__dot"></div>
+                    <div class="three-body__dot"></div>
+                  </div>
                 </div>
                 <div v-else v-html="formatContent(message.content)"></div>
               </div>
@@ -86,10 +90,71 @@ const scrollToBottom = () => {
   })
 }
 
-const formatContent = (text) => {
-  if (!text) return ''
-  return text.replace(/\n/g, '<br/>')
+const escapeHtml = (unsafe) => {
+  return (unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
 }
+
+const renderMarkdown = (md) => {
+  if (!md) return ''
+  // handle fenced code blocks first
+  const codeBlocks = []
+  md = md.replace(/```([\s\S]*?)```/g, (m, code) => {
+    const idx = codeBlocks.length
+    codeBlocks.push(code)
+    return `@@CODE_BLOCK_${idx}@@`
+  })
+
+  // escape remaining text
+  md = escapeHtml(md)
+
+  // headings
+  md = md.replace(/^######\s*(.*)$/gm, '<h6>$1</h6>')
+  md = md.replace(/^#####\s*(.*)$/gm, '<h5>$1</h5>')
+  md = md.replace(/^####\s*(.*)$/gm, '<h4>$1</h4>')
+  md = md.replace(/^###\s*(.*)$/gm, '<h3>$1</h3>')
+  md = md.replace(/^##\s*(.*)$/gm, '<h2>$1</h2>')
+  md = md.replace(/^#\s*(.*)$/gm, '<h1>$1</h1>')
+
+  // links
+  md = md.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+
+  // bold and italic (basic)
+  md = md.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  md = md.replace(/\*(.+?)\*/g, '<em>$1</em>')
+
+  // inline code
+  md = md.replace(/`([^`]+)`/g, '<code>$1</code>')
+
+  // unordered lists: convert lines starting with - or * into ul
+  md = md.replace(/(^|\n)([ \t]*[-\*]\s+.+)(?=\n|$)/g, (m) => {
+    // collect consecutive list items
+    const items = m.split(/\n/).filter(Boolean).map(l => l.replace(/^[ \t]*[-\*]\s+/, ''))
+    return '\n<ul>' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>'
+  })
+
+  // paragraphs: split by blank lines
+  const parts = md.split(/\n\s*\n/)
+  md = parts.map(p => {
+    // restore any inline newlines to <br>
+    const s = p.replace(/\n/g, '<br/>')
+    return /^<(h\d|ul|pre|blockquote)/.test(s) ? s : ('<p>' + s + '</p>')
+  }).join('\n')
+
+  // restore code blocks
+  md = md.replace(/@@CODE_BLOCK_(\d+)@@/g, (m, idx) => {
+    const code = codeBlocks[Number(idx)] || ''
+    return '<pre><code>' + escapeHtml(code) + '</code></pre>'
+  })
+
+  return md
+}
+
+const formatContent = (text) => renderMarkdown(text)
 
 const saveDraft = () => {
   try { localStorage.setItem('ai_draft', inputMessage.value) } catch (e) {}
@@ -115,8 +180,14 @@ const handleSendMessage = async () => {
   sending.value = true
   const history = messages.value.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
 
+  // add placeholder assistant message which will be filled incrementally
+  const aiMsg = { id: messages.value.length + 1, role: 'assistant', content: '', loading: true }
+  messages.value.push(aiMsg)
+  scrollToBottom()
+
   try {
     const payload = { messages: history, stream: false }
+    // 发起非流式请求，显示等待动画（通过 aiMsg.loading）直到收到完整回复
     const resp = await aiService.fullChat(payload)
     const body = resp.data || {}
     let reply = null
@@ -124,14 +195,17 @@ const handleSendMessage = async () => {
       reply = body.choices[0].message.content
     } else if (body.data && body.data.choices && body.data.choices.length > 0) {
       reply = body.data.choices[0].message?.content
+    } else if (body.reply) {
+      reply = body.reply
     }
 
-    const aiMessage = { id: messages.value.length + 1, role: 'assistant', content: reply || '抱歉，AI 未返回有效内容。', loading: false }
-    messages.value.push(aiMessage)
+    aiMsg.content = reply || '抱歉，AI 未返回有效内容。'
+    aiMsg.loading = false
   } catch (e) {
     console.error('AI 请求失败', e)
     const errMsg = (e.response?.data?.message) || e.message || 'AI 请求失败'
-    messages.value.push({ id: messages.value.length + 1, role: 'assistant', content: `错误：${errMsg}`, loading: false })
+    aiMsg.content = `错误：${errMsg}`
+    aiMsg.loading = false
   } finally {
     sending.value = false
     scrollToBottom()
@@ -187,6 +261,112 @@ onBeforeUnmount(() => {
 .btn.send:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(64,158,255,0.18); }
 .btn.send.sending { opacity: 0.8; pointer-events: none; }
 .send-icon { display: block; }
+/* loading spinner */
+.loading-indicator { display: flex; align-items: center; gap: 12px; justify-content: center; }
+
+/* From Uiverse.io by dovatgabriel - three-body animation */
+.three-body {
+ --uib-size: 35px;
+ --uib-speed: 0.8s;
+ --uib-color: #5D3FD3;
+ position: relative;
+ display: inline-block;
+ height: var(--uib-size);
+ width: var(--uib-size);
+ animation: spin78236 calc(var(--uib-speed) * 2.5) infinite linear;
+}
+
+.three-body__dot {
+ position: absolute;
+ height: 100%;
+ width: 30%;
+}
+
+.three-body__dot:after {
+ content: '';
+ position: absolute;
+ height: 0%;
+ width: 100%;
+ padding-bottom: 100%;
+ background-color: var(--uib-color);
+ border-radius: 50%;
+}
+
+.three-body__dot:nth-child(1) {
+ bottom: 5%;
+ left: 0;
+ transform: rotate(60deg);
+ transform-origin: 50% 85%;
+}
+
+.three-body__dot:nth-child(1)::after {
+ bottom: 0;
+ left: 0;
+ animation: wobble1 var(--uib-speed) infinite ease-in-out;
+ animation-delay: calc(var(--uib-speed) * -0.3);
+}
+
+.three-body__dot:nth-child(2) {
+ bottom: 5%;
+ right: 0;
+ transform: rotate(-60deg);
+ transform-origin: 50% 85%;
+}
+
+.three-body__dot:nth-child(2)::after {
+ bottom: 0;
+ left: 0;
+ animation: wobble1 var(--uib-speed) infinite
+  calc(var(--uib-speed) * -0.15) ease-in-out;
+}
+
+.three-body__dot:nth-child(3) {
+ bottom: -5%;
+ left: 0;
+ transform: translateX(116.666%);
+}
+
+.three-body__dot:nth-child(3)::after {
+ top: 0;
+ left: 0;
+ animation: wobble2 var(--uib-speed) infinite ease-in-out;
+}
+
+@keyframes spin78236 {
+ 0% {
+  transform: rotate(0deg);
+ }
+
+ 100% {
+  transform: rotate(360deg);
+ }
+}
+
+@keyframes wobble1 {
+ 0%,
+  100% {
+  transform: translateY(0%) scale(1);
+  opacity: 1;
+ }
+
+ 50% {
+  transform: translateY(-66%) scale(0.65);
+  opacity: 0.8;
+ }
+}
+
+@keyframes wobble2 {
+ 0%,
+  100% {
+  transform: translateY(0%) scale(1);
+  opacity: 1;
+ }
+
+ 50% {
+  transform: translateY(66%) scale(0.65);
+  opacity: 0.8;
+ }
+}
 @media (max-width: 768px) {
   .ai-wrapper { max-width: 100%; }
   .ai-chat-card { height: 78vh; min-height: 480px; }
