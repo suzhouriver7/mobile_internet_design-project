@@ -66,7 +66,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public Long createOrder(CreateOrderRequest request) {
-        log.info("发布预约订单: activityType={}, campus={}", request.getActivityType(), request.getCampus());
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
 
@@ -87,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdatedAt(LocalDateTime.now());
 
         Order savedOrder = orderRepository.save(order);
+        log.info("发布预约订单: activityType={}, campus={}", request.getActivityType(), request.getCampus());
         return savedOrder.getOid();
     }
 
@@ -178,15 +178,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public Long updateOrder(Long orderId, CreateOrderRequest request) {
-        log.info("修改订单信息: orderId={}", orderId);
-
         Order order = getOrderById(orderId);
 
-        // TODO 业务逻辑待审查
-        log.error("OrderService updateOrder 还未审查");
-        if (order.getStatus() != OrderStatus.PENDING) {
-            throw new OrderCancelledException("只有待匹配状态的订单可以修改");
-        }
+        isOrderPendingOrInProcess(orderId, order);
 
         if (request.getActivityType() != null) {
             order.setActivityType(request.getActivityType());
@@ -213,15 +207,17 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
 
+        log.info("修改订单信息: orderId={}", orderId);
         return orderId;
     }
 
     @Override
     @Transactional
     public void deleteOrder(Long orderId) {
-        log.info("删除订单: orderId={}", orderId);
-
         Order order = getOrderById(orderId);
+        if(order == null) {
+            return;
+        }
 
         Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
@@ -231,34 +227,30 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         order.setUpdatedAt(LocalDateTime.now());
         orderRepository.save(order);
+        log.info("删除订单: orderId={}", orderId);
     }
 
     @Override
     @Transactional
     public void completeOrder(Long orderId) {
-        log.info("完成订单: orderId={}", orderId);
-
         Order order = getOrderById(orderId);
-
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            throw new OrderCompletedException("订单已完成: orderId=" + orderId);
+        if(order == null){
+            throw new OrderNotExistException("订单不存在: orderId=" + orderId);
         }
-
         order.setStatus(OrderStatus.COMPLETED);
         order.setUpdatedAt(LocalDateTime.now());
+        log.info("完成订单: orderId={}", orderId);
         orderRepository.save(order);
     }
 
     @Override
     @Transactional
     public Long applyOrder(Long orderId, ApplyOrderRequest request) {
-        log.info("申请加入订单: orderId={}", orderId);
-
         Order order = getOrderById(orderId);
-
-        if (order.getStatus() != OrderStatus.PENDING) {
-            throw new OrderCancelledException("只有待匹配状态的订单可以申请");
+        if (order == null) {
+            throw new OrderNotExistException("订单不存在: orderId=" + orderId);
         }
+        isOrderPendingOrInProcess(orderId, order);
 
         if (order.getCurrentPeople() >= order.getMaxPeople()) {
             throw new OrderFullException("人数已满: orderId=" + orderId);
@@ -290,15 +282,30 @@ public class OrderServiceImpl implements OrderService {
         }
 
         OrderApply savedApply = orderApplyRepository.save(targetApply);
+        log.info("申请加入订单: orderId={}", orderId);
         return savedApply.getApid();
+    }
+
+    private void isOrderPendingOrInProcess(Long orderId, Order order) {
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new OrderCompletedException("订单已完成，无法修改: orderId=" + orderId);
+        }
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            throw new OrderCompletedException("订单已取消，无法修改: orderId=" + orderId);
+        }
+        if (order.getStatus() == OrderStatus.EXPIRED) {
+            throw new OrderExpiredException("订单已过期，无法修改: orderId=" + orderId);
+        }
     }
 
     @Override
     @Transactional
     public void cancelApply(Long orderId) {
-        log.info("取消申请: orderId={}", orderId);
-
         Order order = getOrderById(orderId);
+
+        if (order == null){
+            throw new OrderNotExistException("订单不存在: orderId=" + orderId);
+        }
 
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -308,6 +315,7 @@ public class OrderServiceImpl implements OrderService {
 
         orderApply.setStatus(ApplyStatus.CANCELLED_APPLY);
         orderApplyRepository.save(orderApply);
+        log.info("取消申请: orderId={}", orderId);
     }
 
     @Override
@@ -325,28 +333,27 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void auditApply(Long applyId, ApplyStatus status) {
-        log.info("审核申请: applyId={}, status={}", applyId, status);
-
         OrderApply orderApply = orderApplyRepository.findById(applyId)
                 .orElseThrow(() -> new ApplicationNotExistException("申请记录不存在"));
 
         Order order = orderApply.getOrder();
-
         Long currentUserId = getCurrentUserIdOrThrow();
         if (!order.getUser().getUid().equals(currentUserId)) {
             throw new NoPermissionException("只有订单发布者可以审核申请");
         }
-
-        orderApply.setStatus(status);
-        orderApplyRepository.save(orderApply);
 
         if (status == ApplyStatus.APPROVED) {
             byte currentPeople = order.getCurrentPeople();
             if (currentPeople < order.getMaxPeople()) {
                 order.setCurrentPeople((byte) (currentPeople + 1));
                 orderRepository.save(order);
+            }else{
+                throw new OrderFullException("订单已满: orderId=" + order.getOid());
             }
         }
+        orderApply.setStatus(status);
+        orderApplyRepository.save(orderApply);
+        log.info("审核申请: applyId={}, status={}", applyId, status);
     }
 
     @Override
