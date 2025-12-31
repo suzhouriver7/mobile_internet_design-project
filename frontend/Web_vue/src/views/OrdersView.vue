@@ -280,18 +280,17 @@ const hasApplied = (order) => {
 // 申请按钮是否应禁用
 const isApplyDisabled = (order) => {
   if (!order) return true
-
-  // 发布者：仅在订单未取消且为待匹配状态时允许“取消订单”
+  // 发布者：仅在订单为待匹配时允许“取消订单”操作
   if (isPublisher(order)) {
     if (order.status === 'CANCELLED') return true
-    return order.status !== 'PENDING' ? true : false
+    return order.status !== 'PENDING'
   }
 
-  // 非发布者：已申请、非待匹配状态都不允许再申请
+  // 非发布者：已申请、已过期、人数已满或非待匹配状态都不允许申请
   if (hasApplied(order)) return true
-  if (order.status !== 'PENDING') return true
-  // 人数已满时不允许继续申请
+  if (order.status === 'EXPIRED') return true
   if (order.currentPeople >= order.maxPeople) return true
+  if (order.status !== 'PENDING') return true
   return false
 }
 
@@ -299,16 +298,29 @@ const isApplyDisabled = (order) => {
 const getApplyButtonText = (order) => {
   if (!order) return '申请'
 
+  // 发布者侧文案
   if (isPublisher(order)) {
     if (order.status === 'CANCELLED') return '已取消'
     if (order.status !== 'PENDING') return '不可操作'
     return '取消订单'
   }
 
+  // 已申请
   if (hasApplied(order)) return '已申请'
-  if (order.status !== 'PENDING') return '不可申请'
+
+  // 按状态优先判断显示文案（前端不判断时间，仅基于 status 与人数）
+  if (order.status === 'EXPIRED') return '已过期'
+  if (order.status === 'IN_PROGRESS') return '进行中'
+  if (order.status === 'COMPLETED') return '已完成'
+  if (order.status === 'CANCELLED') return '已取消'
+
+  // 人数判断（优先于申请）
   if (order.currentPeople >= order.maxPeople) return '人数已满'
-  return '申请'
+
+  // 默认可申请文案
+  if (order.status === 'PENDING') return '申请'
+
+  return '不可申请'
 }
 
 // 加载某一页订单中，当前用户是否已申请
