@@ -28,6 +28,9 @@ public class ZhipuAIServiceImpl implements ZhipuAIService {
 
     @Autowired
     private ObjectMapper objectMapper;
+    
+    @Autowired
+    private org.apache.http.impl.client.CloseableHttpClient httpClient;
 
     @Override
     public ChatResponse chat(ChatRequest request) {
@@ -36,7 +39,7 @@ public class ZhipuAIServiceImpl implements ZhipuAIService {
         long baseBackoffMs = 1000L;
 
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
-            try (CloseableHttpClient httpClient = createHttpClient()) {
+            try {
                 HttpPost httpPost = new HttpPost(url);
 
                 httpPost.setHeader("Authorization", "Bearer " + config.getApiKey());
@@ -45,6 +48,14 @@ public class ZhipuAIServiceImpl implements ZhipuAIService {
 
                 String json = objectMapper.writeValueAsString(request);
                 httpPost.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
+
+                // 为每次请求设置请求级别的超时，优先使用配置值（ms）
+                RequestConfig requestConfig = RequestConfig.custom()
+                    .setConnectTimeout(config.getTimeout())
+                    .setSocketTimeout(config.getTimeout())
+                    .setConnectionRequestTimeout(config.getTimeout())
+                    .build();
+                httpPost.setConfig(requestConfig);
 
                 try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                     int statusCode = response.getStatusLine().getStatusCode();
@@ -114,14 +125,5 @@ public class ZhipuAIServiceImpl implements ZhipuAIService {
      *
      * @return CloseableHttpClient 可关闭的HTTP客户端
      */
-    private CloseableHttpClient createHttpClient() {
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(config.getTimeout())
-                .setSocketTimeout(config.getTimeout())
-                .build();
-
-        return HttpClients.custom()
-                .setDefaultRequestConfig(requestConfig)
-                .build();
-    }
+    // 使用注入的共享 HttpClient，删除创建独立客户端方法以避免混淆
 }
