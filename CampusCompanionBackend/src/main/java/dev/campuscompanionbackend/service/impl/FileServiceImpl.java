@@ -53,32 +53,48 @@ public class FileServiceImpl implements FileService {
         }
 
         try {
+
             String url = fileUrl.startsWith("/") ? fileUrl.substring(1) : fileUrl;
-            Path filePath = Paths.get(baseUploadDir).getParent().resolve(url);
 
-            Path basePath = Paths.get("").toAbsolutePath().normalize();
-            Path normalizedFilePath = filePath.normalize();
+            // 计算上传目录的绝对路径：支持 baseUploadDir 为相对路径或绝对路径
+            Path cwd = Paths.get("").toAbsolutePath().normalize();
+            Path baseUploadPath = Paths.get(baseUploadDir);
+            if (!baseUploadPath.isAbsolute()) {
+                baseUploadPath = cwd.resolve(baseUploadDir).normalize();
+            } else {
+                baseUploadPath = baseUploadPath.normalize();
+            }
 
-            if (!normalizedFilePath.startsWith(basePath.resolve(baseUploadDir))) {
-                log.warn("尝试访问非法文件路径: {}", normalizedFilePath);
+            // 如果 URL 中已经包含了 baseUploadDir（例如 "uploads/images/..."），去掉重复前缀
+            String relativeUrl = url;
+            String normalizedBase = baseUploadPath.getFileName() != null ? baseUploadPath.getFileName().toString() : baseUploadDir;
+            if (relativeUrl.startsWith(normalizedBase + "/")) {
+                relativeUrl = relativeUrl.substring(normalizedBase.length() + 1);
+            }
+
+            Path filePath = baseUploadPath.resolve(relativeUrl).normalize();
+
+            // 安全校验：确保最终路径在上传目录之下
+            if (!filePath.startsWith(baseUploadPath)) {
+                log.warn("尝试访问非法文件路径: {} (baseUploadDir={})", filePath, baseUploadPath);
                 throw new FileDeleteFailedException("非法文件路径");
             }
 
-            if (!Files.exists(normalizedFilePath)) {
-                log.warn("文件不存在: {}", normalizedFilePath);
+            if (!Files.exists(filePath)) {
+                log.warn("文件不存在: {}", filePath);
                 throw new FileDeleteFailedException("文件不存在");
             }
 
-            if (!Files.isRegularFile(normalizedFilePath)) {
-                log.warn("路径不是文件: {}", normalizedFilePath);
+            if (!Files.isRegularFile(filePath)) {
+                log.warn("路径不是文件: {}", filePath);
                 throw new FileDeleteFailedException("指定的路径不是一个文件");
             }
 
-            boolean deleted = Files.deleteIfExists(normalizedFilePath);
+            boolean deleted = Files.deleteIfExists(filePath);
             if (deleted) {
-                log.info("文件删除成功: {}", normalizedFilePath);
+                log.info("文件删除成功: {}", filePath);
             } else {
-                log.warn("文件删除失败: {}", normalizedFilePath);
+                log.warn("文件删除失败: {}", filePath);
                 throw new FileDeleteFailedException("文件删除失败");
             }
             return deleted;
