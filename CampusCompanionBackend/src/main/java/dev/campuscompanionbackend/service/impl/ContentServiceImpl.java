@@ -86,9 +86,6 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Long createContent(CreateContentRequest request) {
-        log.info("发布动态: content={}, mediaType={}, orderId={}",
-                request.getContent().substring(0, Math.min(50, request.getContent().length())),
-                request.getMediaType(), request.getOrderId());
 
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -108,12 +105,14 @@ public class ContentServiceImpl implements ContentService {
         }
 
         Post savedPost = postRepository.save(post);
+        log.info("发布动态: content={}, mediaType={}, orderId={}",
+                request.getContent().substring(0, Math.min(50, request.getContent().length())),
+                request.getMediaType(), request.getOrderId());
         return savedPost.getPid();
     }
 
     @Override
     public Object getContents(Integer page, Integer size, Integer type) {
-        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
 
         List<Post> posts;
         if (type != null && type == 1) {
@@ -134,6 +133,7 @@ public class ContentServiceImpl implements ContentService {
                 .map(this::convertToContentVO)
                 .collect(Collectors.toList());
 
+        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
         return new PageResponse<>(
                 contentList,
                 (long) posts.size(),
@@ -144,8 +144,6 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     public Object getContentDetail(Long contentId) {
-        log.info("获取动态详情: contentId={}", contentId);
-
         Post post = getPostById(contentId);
         Map<String, Object> contentDetail = convertToContentDetailVO(post);
 
@@ -156,6 +154,7 @@ public class ContentServiceImpl implements ContentService {
                 post, PostType.COMMENT, ContentStatus.NORMAL);
         contentDetail.put("commentCount", comments.size());
 
+        log.info("获取动态详情: contentId={}", contentId);
         return contentDetail;
     }
 
@@ -168,6 +167,7 @@ public class ContentServiceImpl implements ContentService {
 
         if (post.getType() != PostType.POST) {
             log.error("修改非动态类型");
+            throw new NoPermissionException("修改非动态类型: postId=" + contentId);
         } else {
             if (request.getContent() != null) {
                 post.setContent(request.getContent());
@@ -215,7 +215,7 @@ public class ContentServiceImpl implements ContentService {
 
         String contentType = media.getContentType();
         if (contentType == null) {
-            throw new FileUploadFailedException("无法识别的文件类型: contentId=" + contentId);
+            throw new FileUploadFailedException("无法识别的文件类型: postId=" + contentId);
         }
 
         String uploadDir;

@@ -9,7 +9,9 @@ import dev.campuscompanionbackend.dto.request.ForgotPasswordResetPasswordRequest
 import dev.campuscompanionbackend.dto.response.ApiResponse;
 import dev.campuscompanionbackend.dto.response.LoginResponse;
 import dev.campuscompanionbackend.dto.response.ForgotPasswordVerifyEmailResponse;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordType;
 import dev.campuscompanionbackend.service.AuthService;
+import dev.campuscompanionbackend.service.VerifyService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,10 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController extends BaseController {
     
     private final AuthService authService;
+    private final VerifyService verifyService;
     
     @Autowired
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, VerifyService verifyService) {
         this.authService = authService;
+        this.verifyService = verifyService;
     }
     
     /**
@@ -77,8 +81,6 @@ public class AuthController extends BaseController {
         return success("退出成功", null);
     }
 
-    // ==================== 忘记密码相关接口（与前端 / 文档对齐，逻辑待实现） ====================
-
     /**
      * 忘记密码 - 验证邮箱是否已注册
      * 对应文档：1.5 忘记密码 - 验证邮箱
@@ -88,8 +90,7 @@ public class AuthController extends BaseController {
     public ApiResponse<ForgotPasswordVerifyEmailResponse> verifyEmailForReset(
             @Valid @RequestBody ForgotPasswordVerifyEmailRequest request) {
         ForgotPasswordVerifyEmailResponse response = authService.verifyEmailForReset(request);
-        // TODO: 根据业务需要完善 message 文案
-        return success("邮箱可用于找回密码", response);
+        return success("邮箱合法", response);
     }
 
     /**
@@ -99,9 +100,9 @@ public class AuthController extends BaseController {
      */
     @PostMapping("/forgot/send-code")
     public ApiResponse<Void> sendResetCode(@Valid @RequestBody ForgotPasswordVerifyEmailRequest request) {
-        authService.sendResetCode(request);
-        // TODO: 根据业务需要完善 message 文案
-        return success("验证码已发送", null);
+        String email = request.getEmail();
+        verifyService.verifyEmail(email, VerifyCodeRecordType.FORGET_PWD);
+        return success(String.format("已向 %s 发送验证码", email), null);
     }
 
     /**
@@ -112,7 +113,6 @@ public class AuthController extends BaseController {
     @PostMapping("/forgot/verify-code")
     public ApiResponse<Void> verifyResetCode(@Valid @RequestBody ForgotPasswordVerifyCodeRequest request) {
         authService.verifyResetCode(request);
-        // TODO: 根据业务需要完善 message 文案
         return success("验证码验证通过", null);
     }
 
@@ -124,7 +124,6 @@ public class AuthController extends BaseController {
     @PostMapping("/forgot/reset-password")
     public ApiResponse<Void> resetPassword(@Valid @RequestBody ForgotPasswordResetPasswordRequest request) {
         authService.resetPassword(request);
-        // TODO: 根据业务需要完善 message 文案
         return success("密码重置成功", null);
     }
 }

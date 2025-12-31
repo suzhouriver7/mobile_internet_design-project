@@ -1,6 +1,7 @@
 package dev.campuscompanionbackend.controller;
 
 import dev.campuscompanionbackend.dto.response.ApiResponse;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordType;
 import dev.campuscompanionbackend.exception.UserExistException;
 import dev.campuscompanionbackend.service.VerifyService;
 import dev.campuscompanionbackend.exception.EmailInvalidException;
@@ -23,7 +24,7 @@ public class VerifyController extends BaseController{
 
     @PostMapping("/email/{email}")
     public ApiResponse<Void> verifyEmail(@PathVariable String email) throws EmailInvalidException, UserExistException {
-        verifyService.verifyEmail(email);
+        verifyService.verifyEmail(email, VerifyCodeRecordType.REGISTER);
         return ApiResponse.success(String.format("已向 %s 发送验证码", email), null);
     }
 }
