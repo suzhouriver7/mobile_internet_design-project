@@ -105,7 +105,24 @@
             {{ scope.row.currentPeople }}/{{ scope.row.maxPeople }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column width="240">
+          <template #header>
+            <div class="status-header">
+              <span>状态</span>
+              <el-tooltip effect="light" placement="top" popper-class="status-tooltip-popper">
+                <template #content>
+                  <div class="status-tooltip-content">
+                    <div><strong>待匹配：</strong>订单发布后，参与人数尚未达到上限，且当前时间未超过订单开始时间</div>
+                    <div><strong>进行中：</strong>订单参与人数已达到上限，且当前时间未超过订单开始时间</div>
+                    <div><strong>已完成：</strong>订单参与人数已达到上限，匹配成功，且当前时间已超过订单开始时间</div>
+                    <div><strong>已过期：</strong>订单参与人数未达到上限，且当前时间已超过订单开始时间（即到时间未完成匹配）</div>
+                    <div><strong>已取消：</strong>由订单发布者主动取消</div>
+                  </div>
+                </template>
+                <InfoFilled class="status-info-icon" />
+              </el-tooltip>
+            </div>
+          </template>
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
               {{ getStatusLabel(scope.row.status) }}
@@ -154,6 +171,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
 
@@ -577,5 +595,51 @@ watch(
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.status-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  color: #909399;
+  cursor: pointer;
+}
+/* ensure the svg inside the icon scales down */
+.status-info-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.status-tooltip-content {
+  max-width: 360px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #303133;
+}
+.status-tooltip-content div {
+  margin-bottom: 6px;
+}
+</style>
+
+/* Tooltip popper styling needs to be global because Element Plus mounts popper to body */
+<style>
+.status-tooltip-popper {
+  background-color: #f5f7fa !important;
+  color: #303133 !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08) !important;
+  max-width: 420px !important;
+}
+.status-tooltip-popper .status-tooltip-content {
+  color: inherit !important;
 }
 </style>

@@ -6,8 +6,8 @@
 
     <template v-else>
       <el-card v-if="content" class="content-card" shadow="hover">
-        <div class="card-header">
-          <div class="user-info">
+          <div class="card-header">
+            <div class="user-info">
             <el-avatar
               :size="40"
               :src="resolveAvatarUrl(content.user?.avatarUrl)"
@@ -19,7 +19,12 @@
               <div class="nickname">{{ content.user?.nickname || '用户' }}</div>
               <div class="time">{{ formatTime(content.createdAt) }}</div>
             </div>
-          </div>
+            </div>
+            <div class="card-actions">
+              <el-button v-if="authStore.user && authStore.user.id === content.user?.id" type="danger" text size="small" @click="handleDelete">
+                删除
+              </el-button>
+            </div>
         </div>
 
         <div class="card-content">
@@ -153,7 +158,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Tickets, ArrowRight } from '@element-plus/icons-vue'
 import ThumbFilled from '../components/ThumbFilled.vue'
 import ThumbOutline from '../components/ThumbOutline.vue'
@@ -272,6 +277,28 @@ const handleLike = async () => {
   } catch (error) {
     console.error('点赞失败', error)
     ElMessage.error(error.response?.data?.message || '点赞失败')
+  }
+}
+
+const handleDelete = async () => {
+  try {
+    await ElMessageBox.confirm('删除后将无法恢复，确定要删除该动态吗？', '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    const resp = await contentStore.deleteContent(contentId)
+    // success
+    ElMessage.success('删除成功')
+    router.push('/contents')
+  } catch (err) {
+    if (err === 'cancel' || err?.message === 'cancel') {
+      // 用户取消，不处理
+      return
+    }
+    console.error('删除失败', err)
+    ElMessage.error(err?.response?.data?.message || '删除失败')
   }
 }
 

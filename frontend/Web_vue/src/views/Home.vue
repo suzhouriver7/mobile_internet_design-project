@@ -115,7 +115,7 @@
 
     <!-- 底部：动态流 -->
     <div class="content-list">
-      <el-card v-for="content in contents" :key="content.id" class="content-item">
+      <el-card v-for="content in contents" :key="content.id" class="content-item" @click="handleComment(content.id)">
         <div class="content-header">
           <div class="user-info">
             <el-avatar :src="content.user.avatarUrl" size="small">
@@ -132,12 +132,12 @@
           </div>
         </div>
         <div class="content-footer">
-            <div class="action-item" @click="handleLike(content.id)">
+            <div class="action-item" @click.stop="handleLike(content.id)">
               <el-icon v-if="content.liked"><ThumbFilled /></el-icon>
               <el-icon v-else><ThumbOutline /></el-icon>
               <span>{{ content.likeCount }}</span>
             </div>
-          <div class="action-item" @click="handleComment(content.id)">
+          <div class="action-item" @click.stop="handleComment(content.id)">
             <el-icon><ChatDotRound /></el-icon>
             <span>{{ content.commentCount }}</span>
           </div>

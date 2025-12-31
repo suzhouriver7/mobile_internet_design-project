@@ -66,6 +66,8 @@
             value-format="YYYY-MM-DD HH:mm:ss"
             placeholder="请选择开始时间"
             style="width: 100%"
+            :disabled-date="disabledDate"
+            :disabled-time="disabledTime"
           />
         </el-form-item>
 
@@ -193,6 +195,60 @@ const showMatchingHint = computed(() => {
     matchingCount.value > 0
   )
 })
+
+// 禁止选择早于当前时间的日期/时间
+const disabledDate = (time) => {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  return time.getTime() < todayStart
+}
+
+const disabledTime = (date) => {
+  if (!date) return {}
+  const now = new Date()
+  // 仅在选择的是当天时对小时/分钟进行限制
+  if (
+    date.getFullYear() !== now.getFullYear() ||
+    date.getMonth() !== now.getMonth() ||
+    date.getDate() !== now.getDate()
+  ) {
+    return {}
+  }
+
+  const curHour = now.getHours()
+  const curMinute = now.getMinutes()
+  const curSecond = now.getSeconds()
+
+  return {
+    disabledHours: () => {
+      const arr = []
+      for (let i = 0; i < 24; i++) {
+        if (i < curHour) arr.push(i)
+      }
+      return arr
+    },
+    disabledMinutes: (hour) => {
+      if (hour === curHour) {
+        const arr = []
+        for (let i = 0; i < 60; i++) {
+          if (i < curMinute) arr.push(i)
+        }
+        return arr
+      }
+      return []
+    },
+    disabledSeconds: (hour, minute) => {
+      if (hour === curHour && minute === curMinute) {
+        const arr = []
+        for (let i = 0; i < 60; i++) {
+          if (i < curSecond) arr.push(i)
+        }
+        return arr
+      }
+      return []
+    }
+  }
+}
 
 // 跳转到带预设筛选条件的订单列表页
 const goToMatchedOrders = () => {
