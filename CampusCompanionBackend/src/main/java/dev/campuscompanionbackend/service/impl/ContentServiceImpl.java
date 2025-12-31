@@ -161,30 +161,24 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Long updateContent(Long contentId, CreateContentRequest request) {
-        log.info("修改动态: contentId={}", contentId);
-
         Post post = getPostById(contentId);
 
-        if (post.getType() != PostType.POST) {
-            log.error("修改非动态类型");
-            throw new NoPermissionException("修改非动态类型: postId=" + contentId);
-        } else {
-            if (request.getContent() != null) {
-                post.setContent(request.getContent());
-            }
-
-            if (request.getMediaType() != null) {
-                post.setHasMedia(request.getMediaType());
-            }
-
-            if (request.getOrderId() != null) {
-                post.setOrder(getOrderById(request.getOrderId()));
-            }
-
-            post.setUpdatedAt(LocalDateTime.now());
-            postRepository.save(post);
+        if (request.getContent() != null) {
+            post.setContent(request.getContent());
         }
 
+        if (request.getMediaType() != null) {
+            post.setHasMedia(request.getMediaType());
+        }
+
+        if (request.getOrderId() != null) {
+            post.setOrder(getOrderById(request.getOrderId()));
+        }
+
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        log.info("修改动态/评论: contentId={}", contentId);
         return contentId;
     }
 
@@ -350,8 +344,6 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Map<String, Object> likeContent(Long contentId) {
-        log.info("点赞/取消点赞: contentId={}", contentId);
-
         Post post = getPostById(contentId);
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -374,6 +366,7 @@ public class ContentServiceImpl implements ContentService {
         List<PostLike> likes = postLikeRepository.findByPost(post);
         result.put("count", likes.size());
 
+        log.info("点赞/取消点赞: contentId={}", contentId);
         return result;
     }
 
