@@ -6,6 +6,7 @@ import 'element-plus/dist/index.css'
 import { createPinia } from 'pinia'
 import router from './router'
 import logger from './utils/logger'
+import { useAuthStore } from './stores/auth'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -40,4 +41,25 @@ window.addEventListener('unhandledrejection', (event) => {
 	})
 })
 
-app.mount('#app')
+// 在挂载应用前进行一次同步的登录状态初始化，避免未授权内容闪现。
+const initApp = async () => {
+	// 在 app.use(pinia) 之后才能使用 store
+	const authStore = useAuthStore()
+	const token = localStorage.getItem('token')
+	if (token) {
+		try {
+			// 尝试拉取用户信息校验 token
+			await authStore.getUserInfo()
+		} catch (e) {
+			// 若获取用户信息失败（如 token 过期），清理本地状态并跳回登录
+			try {
+				await authStore.logout()
+			} catch (err) {
+				// 忽略 logout 中的错误
+			}
+		}
+	}
+	app.mount('#app')
+}
+
+initApp()

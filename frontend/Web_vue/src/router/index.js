@@ -7,7 +7,7 @@ const routes = [
     path: '/',
     name: 'Home',
     component: () => import('../views/Home.vue'),
-    meta: { title: '首页' }
+    meta: { title: '首页', requiresAuth: true }
   },
   {
     path: '/login',
@@ -49,7 +49,7 @@ const routes = [
     path: '/contents',
     name: 'Contents',
     component: () => import('../views/ContentsView.vue'),
-    meta: { title: '动态列表' }
+    meta: { title: '动态列表', requiresAuth: true }
   },
   {
     path: '/contents/create',
@@ -67,7 +67,7 @@ const routes = [
     path: '/contents/:id',
     name: 'ContentDetail',
     component: ContentDetailView,
-    meta: { requiresAuth: false, title: '动态详情' }
+    meta: { requiresAuth: true, title: '动态详情' }
   },
   {
     path: '/user/profile',
@@ -93,7 +93,8 @@ router.beforeEach((to, from, next) => {
     if (token) {
       next()
     } else {
-      next({ name: 'Login' })
+      // 带上当前目标路径，登录后可回跳
+      next({ name: 'Login', query: { redirect: to.fullPath } })
     }
   } else {
     next()

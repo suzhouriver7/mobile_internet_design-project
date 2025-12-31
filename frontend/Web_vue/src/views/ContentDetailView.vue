@@ -94,7 +94,8 @@
               :type="content.liked ? 'primary' : 'default'"
               @click="handleLike"
             >
-              <el-icon><Star /></el-icon>
+              <el-icon v-if="content.liked"><ThumbFilled /></el-icon>
+              <el-icon v-else><ThumbOutline /></el-icon>
               <span>{{ content.liked ? '已点赞' : '点赞' }}（{{ content.likeCount || 0 }}）</span>
             </el-button>
             <span class="stat">评论 {{ content.commentCount || 0 }}</span>
@@ -153,7 +154,9 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Star, Tickets, ArrowRight } from '@element-plus/icons-vue'
+import { Tickets, ArrowRight } from '@element-plus/icons-vue'
+import ThumbFilled from '../components/ThumbFilled.vue'
+import ThumbOutline from '../components/ThumbOutline.vue'
 import { useContentStore } from '../stores/content'
 import { useAuthStore } from '../stores/auth'
 import CommentItem from '../components/CommentItem.vue'

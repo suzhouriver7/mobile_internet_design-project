@@ -191,6 +191,14 @@ body {
       &:hover {
         color: #66b1ff;
       }
+      .ai-quick {
+        margin-left: 12px;
+        font-size: 14px;
+        color: #606266;
+        text-decoration: none;
+        padding: 6px 8px;
+        border-radius: 6px;
+      }
     }
   }
   
