@@ -1,6 +1,5 @@
 <template>
   <div class="ai-view">
-    <div class="ai-wrapper">
       <header class="ai-header">
         <h2>AI 问询</h2>
       </header>
@@ -60,7 +59,6 @@
           </div>
         </div>
       </section>
-    </div>
   </div>
 </template>
 
@@ -235,8 +233,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ai-view { display: flex; justify-content: center; padding: 24px 16px; }
-.ai-wrapper { width: 100%; max-width: 900px; }
+.ai-view { width: 100%; max-width: min(1600px, 95%); margin: 0 auto; padding: 24px 16px; box-sizing: border-box; }
 .ai-header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .ai-header h2 { margin: 0; font-size: 20px; }
 .ai-sub { color: #666; margin: 0; }
@@ -245,7 +242,7 @@ onBeforeUnmount(() => {
 .message-row { display: flex; gap: 12px; align-items: flex-start; }
 .message-row.user { flex-direction: row-reverse; }
 .avatar { flex: 0 0 36px; }
-.bubble { max-width: 78%; }
+.bubble { max-width: clamp(480px, 60%, 900px); }
 .bubble-content { padding: 12px 14px; border-radius: 12px; line-height: 1.6; }
 .message-row.user .bubble-content { background: #409eff; color: #fff; border-bottom-right-radius: 6px; }
 .message-row.assistant .bubble-content { background: #f5f7fa; color: #333; border-bottom-left-radius: 6px; }
@@ -367,10 +364,16 @@ onBeforeUnmount(() => {
   opacity: 0.8;
  }
 }
-@media (max-width: 768px) {
-  .ai-wrapper { max-width: 100%; }
+@media (max-width: 1200px) {
+  .ai-view { max-width: 95%; padding: 16px; }
   .ai-chat-card { height: 78vh; min-height: 480px; }
   .bubble { max-width: 82%; }
+}
+
+@media (max-width: 600px) {
+  .ai-view { padding: 10px; }
+  .ai-chat-card { height: 72vh; min-height: 420px; }
+  .bubble { max-width: 92%; }
   .btn.send { width: 40px; height: 40px; }
 }
 </style>
