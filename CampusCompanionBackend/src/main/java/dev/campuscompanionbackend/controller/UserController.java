@@ -92,4 +92,13 @@ public class UserController extends BaseController {
         Object result = userService.searchUsers(keyword, page, size);
         return success(result);
     }
+
+    @PostMapping("/password/reset-by-code")
+    public ApiResponse<Void> resetPasswordByCode(
+            @RequestParam String code,
+            @RequestParam String password
+            ) {
+        userService.resetPassword();
+        return success("修改密码成功", null);
+    }
 }

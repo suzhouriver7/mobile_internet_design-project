@@ -48,4 +48,6 @@ public interface UserService {
      * @return Object 分页用户列表
      */
     Object searchUsers(String keyword, Integer page, Integer size);
+
+    void resetPassword();
 }

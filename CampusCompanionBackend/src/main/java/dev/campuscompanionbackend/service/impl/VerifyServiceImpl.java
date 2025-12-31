@@ -1,8 +1,13 @@
 package dev.campuscompanionbackend.service.impl;
 
+import dev.campuscompanionbackend.entity.VerifyCodeRecord;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordStatus;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordType;
 import dev.campuscompanionbackend.exception.UserExistException;
+import dev.campuscompanionbackend.exception.UserNotExistException;
 import dev.campuscompanionbackend.repository.UserRepository;
 import dev.campuscompanionbackend.entity.User;
+import dev.campuscompanionbackend.repository.VerifyCodeRecordRepository;
 import dev.campuscompanionbackend.service.VerifyService;
 import dev.campuscompanionbackend.exception.EmailInvalidException;
 import dev.campuscompanionbackend.utils.EmailTemplateUtil;
@@ -27,7 +32,7 @@ import java.time.LocalDateTime;
 public class VerifyServiceImpl implements VerifyService {
 
     private final JavaMailSender mailSender;
-    private final UserRepository userRepository;
+    private final VerifyCodeRecordRepository verifyCodeRecordRepository;
     private final PasswordEncoder passwordEncoder;
 
     // 验证码有效期（分钟）
@@ -35,18 +40,21 @@ public class VerifyServiceImpl implements VerifyService {
 
 
     @Transactional
-    public void verifyEmail(String email) throws EmailInvalidException, UserExistException {
-        if(userRepository.existsByEmail(email)){
-            throw new UserExistException(String.format("邮箱已注册: email=%s", email));
-        }
-
+    public void verifyEmail(String email, VerifyCodeRecordType type) throws EmailInvalidException, UserExistException {
         String code = VerifyCodeUtil.generateCode6Num();
         LocalDateTime expireTime =
                 LocalDateTime.now().plusMinutes(EXPIRE_MINUTES);
         String content = EmailTemplateUtil.buildVerifyCodeEmail(code, EXPIRE_MINUTES);
         sendEmail(email, "邮箱验证码", content);
 
-        userRepository.save(User.buildRegisteringUser(email, passwordEncoder.encode(code), expireTime));
+        VerifyCodeRecord record = new VerifyCodeRecord();
+        record.setEmail(email);
+        record.setCode(passwordEncoder.encode(code));
+        record.setType(type);
+        record.setStatus(VerifyCodeRecordStatus.UNUSED);
+        record.setExpiredAt(expireTime);
+        verifyCodeRecordRepository.save(record);
+        log.info("发送验证码: email={}, code={}", email, code);
     }
 
 

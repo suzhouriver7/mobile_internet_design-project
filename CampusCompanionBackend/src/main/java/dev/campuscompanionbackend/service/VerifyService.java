@@ -1,6 +1,7 @@
 package dev.campuscompanionbackend.service;
 
 
+import dev.campuscompanionbackend.enums.VerifyCodeRecordType;
 import dev.campuscompanionbackend.exception.EmailInvalidException;
 import dev.campuscompanionbackend.exception.UserExistException;
 
@@ -12,5 +13,5 @@ public interface VerifyService {
      * @param email the email
      * @throws EmailInvalidException the email verify exception
      */
-    void verifyEmail(String email) throws EmailInvalidException, UserExistException;
+    void verifyEmail(String email, VerifyCodeRecordType type) throws EmailInvalidException, UserExistException;
 }

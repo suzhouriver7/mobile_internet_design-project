@@ -9,10 +9,14 @@ import dev.campuscompanionbackend.dto.response.LoginResponse;
 import dev.campuscompanionbackend.dto.response.UserInfoResponse;
 import dev.campuscompanionbackend.dto.response.ForgotPasswordVerifyEmailResponse;
 import dev.campuscompanionbackend.entity.User;
+import dev.campuscompanionbackend.entity.VerifyCodeRecord;
 import dev.campuscompanionbackend.enums.UserStatus;
 import dev.campuscompanionbackend.enums.UserType;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordStatus;
+import dev.campuscompanionbackend.enums.VerifyCodeRecordType;
 import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.UserRepository;
+import dev.campuscompanionbackend.repository.VerifyCodeRecordRepository;
 import dev.campuscompanionbackend.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,7 @@ import java.util.Optional;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final VerifyCodeRecordRepository verifyCodeRecordRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -71,27 +76,31 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail();
         String verifyCode = request.getVerifycode();
 
-        Optional<User> optionalUser = userRepository.findByEmail(email);
-        if(optionalUser.isEmpty()){
-            throw new RegisterFailedException("邮箱未验证: email=" + email);
-        }
-        User user = optionalUser.get();
+        VerifyCodeRecord record = verifyCodeRecordRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
+                email, VerifyCodeRecordType.REGISTER, VerifyCodeRecordStatus.UNUSED
+                ).orElseThrow(() -> new RegisterFailedException("用户未请求验证码: email=" + email));
 
-        if(optionalUser.get().getUserStatus() != UserStatus.REGISTERING){
-            throw new UserExistException("邮箱已注册");
+        if (record.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new RegisterFailedException("验证码已过期: email=" + email);
         }
-        if(!passwordEncoder.matches(request.getPassword(), verifyCode)) {
+
+
+        if(!passwordEncoder.matches(verifyCode, record.getCode())) {
             throw new VerifyCodeErrorException(
                     String.format("验证码错误: email=%s, receivedVerifyCode=%s", email, verifyCode)
             );
         }
+        record.setStatus(VerifyCodeRecordStatus.USED);
+        verifyCodeRecordRepository.save(record);
 
+        User user = new User();
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
         user.setUserType(UserType.COMMON);
         user.setUserStatus(UserStatus.ONLINE);
-
         User savedUser = userRepository.save(user);
+
         log.info("用户注册: userId= {}, email={}, nickname={}", user.getUid(), user.getEmail(), user.getNickname());
         return savedUser.getUid();
     }
@@ -106,8 +115,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void logout(Long userId) {
         if (userId == null) {
-            log.warn("用户退出登录但未提供 userId");
-            return;
+            throw new SomethingHappenedException("用户退出登录但未提供 userId");
         }
 
         User user = userRepository.findById(userId)
@@ -119,17 +127,14 @@ public class AuthServiceImpl implements AuthService {
         log.info("用户退出登录: userId={}", userId);
     }
 
-    // ==================== 忘记密码相关方法（当前为固定成功结果，便于前端联调） ====================
 
     @Override
     public ForgotPasswordVerifyEmailResponse verifyEmailForReset(ForgotPasswordVerifyEmailRequest request) {
-        // TODO: 后续这里应检查邮箱是否存在，并结合验证码记录
         String email = request.getEmail();
         ForgotPasswordVerifyEmailResponse resp = new ForgotPasswordVerifyEmailResponse();
 
-        if (email == null || !email.contains("@")) {
-            resp.setEmailMasked(email);
-            return resp;
+        if(!userRepository.existsByEmail(email)) {
+            throw new UserNotExistException("邮箱未注册: email=" + email);
         }
 
         int atIndex = email.indexOf('@');
@@ -145,20 +150,34 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void sendResetCode(ForgotPasswordVerifyEmailRequest request) {
-        // TODO: 后续应在此生成并发送用于重置密码的邮箱验证码，且控制发送频率
-        log.info("[MOCK] send reset code to email={}", request.getEmail());
-    }
-
-    @Override
     public void verifyResetCode(ForgotPasswordVerifyCodeRequest request) {
-        // TODO: 后续应校验邮箱对应的验证码是否正确且未过期
-        log.info("[MOCK] verify reset code for email={}, code={}", request.getEmail(), request.getVerifyCode());
+        String email = request.getEmail();
+        String code = String.valueOf(request.getVerifyCode());
+        VerifyCodeRecord record = verifyCodeRecordRepository.findFirstByEmailAndTypeAndStatusOrderByCreatedAtDesc(
+                email, VerifyCodeRecordType.FORGET_PWD, VerifyCodeRecordStatus.UNUSED
+        ).orElseThrow(()->
+                new SomethingHappenedException("邮箱未验证: email=" + email)
+        );
+        if(record.getExpiredAt().isBefore(LocalDateTime.now())){
+            throw new RegisterFailedException("验证码已过期: email=" + email);
+        }
+        if(!passwordEncoder.matches(code, record.getCode())) {
+            throw new VerifyCodeErrorException("验证码错误: email=" + email);
+        }
+        record.setStatus(VerifyCodeRecordStatus.USED);
+        verifyCodeRecordRepository.save(record);
+        log.info("验证验证码: email={}, code={}", request.getEmail(), request.getVerifyCode());
     }
 
     @Override
     public void resetPassword(ForgotPasswordResetPasswordRequest request) {
-        // TODO: 后续应再次校验验证码，并为该邮箱对应的用户设置新密码
-        log.info("[MOCK] reset password for email={}", request.getEmail());
+        String email = request.getEmail();
+        String password = request.getNewPassword();
+        User user = userRepository.findByEmail(email).orElseThrow(()->
+                new UserNotExistException("邮箱未注册: email=" + email)
+                );
+        user.setPassword(passwordEncoder.encode(password));
+        userRepository.save(user);
+        log.info("已重置密码: email={}", request.getEmail());
     }
 }

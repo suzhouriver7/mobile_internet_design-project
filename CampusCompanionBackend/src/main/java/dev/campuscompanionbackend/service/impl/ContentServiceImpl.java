@@ -86,9 +86,6 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Long createContent(CreateContentRequest request) {
-        log.info("发布动态: content={}, mediaType={}, orderId={}",
-                request.getContent().substring(0, Math.min(50, request.getContent().length())),
-                request.getMediaType(), request.getOrderId());
 
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -108,12 +105,14 @@ public class ContentServiceImpl implements ContentService {
         }
 
         Post savedPost = postRepository.save(post);
+        log.info("发布动态: content={}, mediaType={}, orderId={}",
+                request.getContent().substring(0, Math.min(50, request.getContent().length())),
+                request.getMediaType(), request.getOrderId());
         return savedPost.getPid();
     }
 
     @Override
     public Object getContents(Integer page, Integer size, Integer type) {
-        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
 
         List<Post> posts;
         if (type != null && type == 1) {
@@ -134,6 +133,7 @@ public class ContentServiceImpl implements ContentService {
                 .map(this::convertToContentVO)
                 .collect(Collectors.toList());
 
+        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
         return new PageResponse<>(
                 contentList,
                 (long) posts.size(),
@@ -144,8 +144,6 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     public Object getContentDetail(Long contentId) {
-        log.info("获取动态详情: contentId={}", contentId);
-
         Post post = getPostById(contentId);
         Map<String, Object> contentDetail = convertToContentDetailVO(post);
 
@@ -156,35 +154,31 @@ public class ContentServiceImpl implements ContentService {
                 post, PostType.COMMENT, ContentStatus.NORMAL);
         contentDetail.put("commentCount", comments.size());
 
+        log.info("获取动态详情: contentId={}", contentId);
         return contentDetail;
     }
 
     @Override
     @Transactional
     public Long updateContent(Long contentId, CreateContentRequest request) {
-        log.info("修改动态: contentId={}", contentId);
-
         Post post = getPostById(contentId);
 
-        if (post.getType() != PostType.POST) {
-            log.error("修改非动态类型");
-        } else {
-            if (request.getContent() != null) {
-                post.setContent(request.getContent());
-            }
-
-            if (request.getMediaType() != null) {
-                post.setHasMedia(request.getMediaType());
-            }
-
-            if (request.getOrderId() != null) {
-                post.setOrder(getOrderById(request.getOrderId()));
-            }
-
-            post.setUpdatedAt(LocalDateTime.now());
-            postRepository.save(post);
+        if (request.getContent() != null) {
+            post.setContent(request.getContent());
         }
 
+        if (request.getMediaType() != null) {
+            post.setHasMedia(request.getMediaType());
+        }
+
+        if (request.getOrderId() != null) {
+            post.setOrder(getOrderById(request.getOrderId()));
+        }
+
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        log.info("修改动态/评论: contentId={}", contentId);
         return contentId;
     }
 
@@ -215,7 +209,7 @@ public class ContentServiceImpl implements ContentService {
 
         String contentType = media.getContentType();
         if (contentType == null) {
-            throw new FileUploadFailedException("无法识别的文件类型: contentId=" + contentId);
+            throw new FileUploadFailedException("无法识别的文件类型: postId=" + contentId);
         }
 
         String uploadDir;
@@ -350,8 +344,6 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Map<String, Object> likeContent(Long contentId) {
-        log.info("点赞/取消点赞: contentId={}", contentId);
-
         Post post = getPostById(contentId);
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -374,6 +366,7 @@ public class ContentServiceImpl implements ContentService {
         List<PostLike> likes = postLikeRepository.findByPost(post);
         result.put("count", likes.size());
 
+        log.info("点赞/取消点赞: contentId={}", contentId);
         return result;
     }
 
