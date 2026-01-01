@@ -33,7 +33,7 @@ public class VerifyCodeRecord {
     /**
      * 验证码
      */
-    @Column(name = "code", nullable = false, length = 10)
+    @Column(name = "code", nullable = false, length = 100)
     private String code;
 
     /**

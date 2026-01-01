@@ -14,6 +14,13 @@ export const register = async (userData) => {
   return response.data
 }
 
+// 注册：发送邮箱验证码（用于注册场景）
+export const sendRegisterCode = async (email) => {
+  const encodedEmail = encodeURIComponent(email)
+  const response = await api.post(`/verify/email/${encodedEmail}`)
+  return response.data
+}
+
 // 退出登录
 export const logout = async () => {
   const response = await api.post('/auth/logout')
