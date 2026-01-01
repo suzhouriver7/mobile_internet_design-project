@@ -33,6 +33,18 @@ export const ACTIVITY_TYPE_MAP = {
   7: '其他'
 }
 
+// 字符串枚举名称到中文的映射（后端返回的是字符串枚举名称）
+export const ACTIVITY_TYPE_STRING_MAP = {
+  'BASKETBALL': '篮球',
+  'BADMINTON': '羽毛球',
+  'MEAL': '吃饭',
+  'STUDY': '自习',
+  'MOVIE': '看电影',
+  'RUNNING': '跑步',
+  'GAME': '游戏',
+  'OTHER': '其他'
+}
+
 // 性别要求 - 对应 GenderRequire
 export const GENDER_REQUIRE = {
   MALE: 0,    // 男
@@ -44,6 +56,13 @@ export const GENDER_REQUIRE_MAP = {
   0: '仅限男生',
   1: '仅限女生',
   2: '性别不限'
+}
+
+// 字符串枚举名称到中文的映射
+export const GENDER_REQUIRE_STRING_MAP = {
+  'MALE': '仅限男生',
+  'FEMALE': '仅限女生',
+  'ANY': '性别不限'
 }
 
 // 校区 - 对应 Campus
@@ -63,6 +82,15 @@ export const CAMPUS_MAP = {
   4: '其他校区'
 }
 
+// 字符串枚举名称到中文的映射
+export const CAMPUS_STRING_MAP = {
+  'LIANGXIANG': '良乡校区',
+  'ZHONGGUANCUN': '中关村校区',
+  'ZHUHAI': '珠海校区',
+  'XISHAN': '西山校区',
+  'OTHER_CAMPUS': '其他校区'
+}
+
 // 订单状态 - 对应 OrderStatus
 export const ORDER_STATUS = {
   PENDING: 0,       // 待匹配
@@ -80,6 +108,15 @@ export const ORDER_STATUS_MAP = {
   4: '已过期'
 }
 
+// 字符串枚举名称到中文的映射
+export const ORDER_STATUS_STRING_MAP = {
+  'PENDING': '待匹配',
+  'IN_PROGRESS': '进行中',
+  'COMPLETED': '已完成',
+  'CANCELLED': '已取消',
+  'EXPIRED': '已过期'
+}
+
 // 申请状态 - 对应 ApplyStatus
 export const APPLY_STATUS = {
   PENDING_REVIEW: 0,    // 待审核
@@ -93,6 +130,14 @@ export const APPLY_STATUS_MAP = {
   1: '已通过',
   2: '已拒绝',
   3: '已取消'
+}
+
+// 字符串枚举名称到中文的映射
+export const APPLY_STATUS_STRING_MAP = {
+  'PENDING_REVIEW': '待审核',
+  'APPROVED': '已通过',
+  'REJECTED': '已拒绝',
+  'CANCELLED_APPLY': '已取消'
 }
 
 // 内容类型 - 对应 PostType
