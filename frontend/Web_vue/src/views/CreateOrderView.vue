@@ -102,11 +102,12 @@
 
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useOrderStore } from '../stores/order'
 
 const router = useRouter()
+const route = useRoute()
 const orderStore = useOrderStore()
 
 const formRef = ref(null)
@@ -124,6 +125,19 @@ const form = reactive({
   note: '',
   maxPeople: 2
 })
+
+// 如果是从 AI / MCP 跳转过来，支持通过 query 预填表单
+const q = route.query || {}
+if (q.activityType) form.activityType = String(q.activityType)
+if (q.campus) form.campus = String(q.campus)
+if (q.location) form.location = String(q.location)
+if (q.startTime) form.startTime = String(q.startTime)
+if (q.genderRequire) form.genderRequire = String(q.genderRequire)
+if (q.maxPeople) {
+  const n = Number(q.maxPeople)
+  if (!Number.isNaN(n) && n > 0 && n <= 20) form.maxPeople = n
+}
+if (q.note) form.note = String(q.note)
 
 const rules = {
   activityType: [

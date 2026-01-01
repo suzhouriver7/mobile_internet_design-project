@@ -17,6 +17,7 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,6 +35,12 @@ public class VerifyServiceImpl implements VerifyService {
     private final JavaMailSender mailSender;
     private final VerifyCodeRecordRepository verifyCodeRecordRepository;
     private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 发件人邮箱地址，需与 spring.mail.username 保持一致
+     */
+    @Value("${spring.mail.username}")
+    private String fromEmail;
 
     // 验证码有效期（分钟）
     private static final int EXPIRE_MINUTES = 5;
@@ -69,6 +76,8 @@ public class VerifyServiceImpl implements VerifyService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper =
                     new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            // 一些邮箱服务（如 163）要求 From 与认证账号一致，否则会报 553
+            helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, true);

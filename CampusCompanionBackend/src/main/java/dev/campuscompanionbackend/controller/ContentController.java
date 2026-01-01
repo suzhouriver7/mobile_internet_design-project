@@ -142,6 +142,19 @@ public class ContentController extends BaseController {
         Object result = contentService.getComments(contentId, page, size);
         return success(result);
     }
+
+    /**
+     * 删除评论（包含其所有子评论）
+     *
+     * 只有评论作者或管理员可以删除。
+     * @param commentId 评论ID
+     * @return ApiResponse<Void>
+     */
+    @DeleteMapping("/comments/{commentId}")
+    public ApiResponse<Void> deleteComment(@PathVariable Long commentId) {
+        contentService.deleteComment(commentId);
+        return success("删除评论成功", null);
+    }
     
     /**
      * 点赞/取消点赞

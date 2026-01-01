@@ -533,10 +533,12 @@ const getUserInitial = (user) => {
   return '用'
 }
 
-// 是否为当前订单的发布者
+// 是否为当前订单的发布者；管理员视为“拥有者”，可在详情页操作所有订单
 const isPublisher = computed(() => {
-  if (!currentUserId.value || !order.value?.user) return false
-  return order.value.user.id === currentUserId.value
+  const user = authStore.user
+  if (!user || !order.value?.user) return false
+  if (user.userType === 1 || user.userType === 'ADMIN') return true
+  return order.value.user.id === user.id
 })
 
 // 是否可以编辑订单（仅发布者 + 待匹配状态）
