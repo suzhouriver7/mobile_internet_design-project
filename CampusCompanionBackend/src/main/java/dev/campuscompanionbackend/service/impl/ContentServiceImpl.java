@@ -7,6 +7,7 @@ import dev.campuscompanionbackend.entity.*;
 import dev.campuscompanionbackend.enums.ContentStatus;
 import dev.campuscompanionbackend.enums.MediaType;
 import dev.campuscompanionbackend.enums.PostType;
+import dev.campuscompanionbackend.enums.UserType;
 import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.*;
 import dev.campuscompanionbackend.service.ContentService;
@@ -191,9 +192,13 @@ public class ContentServiceImpl implements ContentService {
         Post post = getPostById(contentId);
 
         Long currentUserId = getCurrentUserIdOrThrow();
-        if (!post.getUser().getUid().equals(currentUserId)) {
+        User currentUser = getUserById(currentUserId);
+        // 发布者本人或管理员可以删除任意动态
+        boolean isOwner = post.getUser().getUid().equals(currentUserId);
+        boolean isAdmin = currentUser.getUserType() == UserType.ADMIN;
+        if (!isOwner && !isAdmin) {
             throw new SomethingHappenedException(
-                    String.format("非动态发布者尝试删除动态: userId=%d, contentId=%d", post.getUser().getUid(), contentId)
+                    String.format("无权删除动态: operatorId=%d, ownerId=%d, contentId=%d", currentUserId, post.getUser().getUid(), contentId)
             );
         }
 
