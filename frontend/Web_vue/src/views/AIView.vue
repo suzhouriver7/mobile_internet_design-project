@@ -19,7 +19,25 @@
                     <div class="three-body__dot"></div>
                   </div>
                 </div>
-                <div v-else v-html="formatContent(message.content)"></div>
+                <div v-else>
+                  <template v-if="message.type === 'order-draft-suggestion'">
+                    <p>我可以为你预填写如下订单信息：</p>
+                    <ul>
+                      <li>活动类型：{{ activityTypeLabel(message.draft?.activityType) }}</li>
+                      <li>校区：{{ campusLabel(message.draft?.campus) }}</li>
+                      <li>地点：{{ message.draft?.location || '未指定' }}</li>
+                      <li>时间：{{ message.draft?.startTime || '未指定' }}</li>
+                      <li>性别要求：{{ genderLabel(message.draft?.genderRequire) }}</li>
+                      <li>人数上限：{{ message.draft?.maxPeople || 2 }}</li>
+                    </ul>
+                    <el-button type="primary" text @click="handleApplyOrderDraft(message)">
+                      点击跳转并预填写订单
+                    </el-button>
+                  </template>
+                  <template v-else>
+                    <div v-html="formatContent(message.content)"></div>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
@@ -64,9 +82,12 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import aiService from '../services/ai'
+import { orderAssistantService } from '../mcp/orderAssistant'
 
 const chatContainer = ref(null)
+const router = useRouter()
 const messages = ref([
   { id: 1, role: 'assistant', content: '你好！我是校园约伴系统的AI助手，有什么可以帮助你的吗？', loading: false }
 ])
@@ -79,6 +100,59 @@ const userAvatar = ref('https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c672
 const aiAvatar = ref('https://cube.elemecdn.com/9/c2/f0ee8a3c7c9638a54940382568c9dpng.png')
 
 const inputLength = computed(() => inputMessage.value.length)
+
+// 活动/校区/性别的文案映射，用于预填写预览
+const activityTypeLabel = (type) => {
+  if (!type) return '未指定'
+  const map = {
+    BASKETBALL: '篮球',
+    BADMINTON: '羽毛球',
+    MEAL: '吃饭',
+    STUDY: '自习',
+    MOVIE: '看电影',
+    RUNNING: '跑步',
+    GAME: '游戏',
+    OTHER: '其他'
+  }
+  return map[type] || '其他'
+}
+
+const campusLabel = (campus) => {
+  if (!campus) return '未指定'
+  const map = {
+    LIANGXIANG: '良乡校区',
+    ZHONGGUANCUN: '中关村校区',
+    ZHUHAI: '珠海校区',
+    XISHAN: '西山校区',
+    OTHER_CAMPUS: '其他校区'
+  }
+  return map[campus] || '未指定'
+}
+
+const genderLabel = (g) => {
+  if (!g) return '不限'
+  const map = {
+    ANY: '不限',
+    MALE: '仅限男生',
+    FEMALE: '仅限女生'
+  }
+  return map[g] || '不限'
+}
+
+// 判断一条用户输入是否在“请求生成/预填订单”
+const shouldTriggerOrderMcpFromText = (text) => {
+  if (!text) return false
+  const t = text.toLowerCase()
+  return (
+    t.includes('帮我约') ||
+    t.includes('帮我生成订单') ||
+    t.includes('帮我下一个订单') ||
+    t.includes('帮我预填订单') ||
+    t.includes('帮我预填写订单') ||
+    t.includes('生成一个订单') ||
+    t.includes('创建一个订单')
+  )
+}
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -207,9 +281,44 @@ const handleSendMessage = async () => {
   } finally {
     sending.value = false
     scrollToBottom()
+
+    // 如果本轮用户输入中明确请求“帮我生成/预填订单”，在 AI 回复后追加一条“预填写预览”消息，供用户点击跳转
+    if (shouldTriggerOrderMcpFromText(userMessage.content)) {
+      try {
+        const result = await orderAssistantService({
+          messages: messages.value,
+          inputText: userMessage.content,
+          router: null
+        })
+
+        const draft = result?.draft || {}
+        const query = result?.query || {}
+
+        const suggestionMsg = {
+          id: messages.value.length + 1,
+          role: 'assistant',
+          type: 'order-draft-suggestion',
+          content: '',
+          draft,
+          query
+        }
+        messages.value.push(suggestionMsg)
+        scrollToBottom()
+      } catch (err) {
+        console.error('生成订单预填写预览失败', err)
+      }
+    }
   }
 }
 
+const handleApplyOrderDraft = async (message) => {
+  if (!message || !message.query) return
+  try {
+    await router.push({ path: '/orders/create', query: message.query })
+  } catch (err) {
+    console.error('跳转创建订单页面失败', err)
+  }
+}
 const handleClear = () => {
   messages.value = [ { id: 1, role: 'assistant', content: '已清空对话，欢迎继续提问。', loading: false } ]
   try { localStorage.removeItem('ai_draft') } catch (e) {}

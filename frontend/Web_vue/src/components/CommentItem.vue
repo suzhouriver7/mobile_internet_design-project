@@ -33,6 +33,15 @@
             <el-icon><ChatDotRound /></el-icon>
             <span>回复</span>
           </el-button>
+          <el-button
+            v-if="canDelete"
+            text
+            type="danger"
+            size="small"
+            @click="onDelete"
+          >
+            删除
+          </el-button>
         </div>
       </div>
     </div>
@@ -53,7 +62,9 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { ChatDotRound } from '@element-plus/icons-vue'
+import { useAuthStore } from '../stores/auth'
 
 const props = defineProps({
   comment: {
@@ -66,7 +77,9 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['reply'])
+const emit = defineEmits(['reply', 'delete'])
+
+const authStore = useAuthStore()
 
 const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
 
@@ -92,6 +105,18 @@ const formatTime = (time) => {
 
 const onReply = () => {
   emit('reply', props.comment)
+}
+
+const canDelete = computed(() => {
+  const user = authStore.user
+  if (!user) return false
+  const isAdmin = user.userType === 1 || user.userType === 'ADMIN'
+  const isOwner = props.comment?.user?.id === user.id
+  return isAdmin || isOwner
+})
+
+const onDelete = () => {
+  emit('delete', props.comment)
 }
 </script>
 

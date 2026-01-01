@@ -8,6 +8,7 @@ import dev.campuscompanionbackend.enums.ActivityType;
 import dev.campuscompanionbackend.enums.ApplyStatus;
 import dev.campuscompanionbackend.enums.Campus;
 import dev.campuscompanionbackend.enums.OrderStatus;
+import dev.campuscompanionbackend.enums.UserType;
 import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.*;
 import dev.campuscompanionbackend.service.OrderService;
@@ -220,8 +221,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Long currentUserId = getCurrentUserIdOrThrow();
-        if (!order.getUser().getUid().equals(currentUserId)) {
-            throw new NoPermissionException("只有订单发布者可以删除订单");
+        User currentUser = getUserById(currentUserId);
+        boolean isOwner = order.getUser().getUid().equals(currentUserId);
+        boolean isAdmin = currentUser.getUserType() == UserType.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new NoPermissionException("只有订单发布者或管理员可以删除订单");
         }
 
         order.setStatus(OrderStatus.CANCELLED);

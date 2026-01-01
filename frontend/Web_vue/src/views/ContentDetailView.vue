@@ -147,6 +147,7 @@
             :comment="item"
             :level="0"
             @reply="handleReply"
+            @delete="handleDeleteComment"
           />
         </div>
         <el-empty v-else description="快来抢沙发~" />
@@ -348,6 +349,32 @@ const handleSubmitComment = async () => {
 const handleReply = (comment) => {
   replyParentId.value = comment.id
   commentText.value = `@${comment.user?.nickname || '用户'} `
+}
+
+const handleDeleteComment = async (comment) => {
+  if (!comment || !comment.id) return
+
+  try {
+    await ElMessageBox.confirm(
+      '删除后该评论及其下所有回复将无法恢复，确定要删除吗？',
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await contentStore.deleteComment(comment.id)
+    ElMessage.success('删除评论成功')
+    fetchComments()
+  } catch (err) {
+    if (err === 'cancel' || err?.message === 'cancel') {
+      return
+    }
+    console.error('删除评论失败', err)
+    ElMessage.error(err?.response?.data?.message || '删除评论失败')
+  }
 }
 
 const handleBack = () => {
