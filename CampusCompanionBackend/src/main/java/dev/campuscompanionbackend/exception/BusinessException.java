@@ -1,24 +1,21 @@
 package dev.campuscompanionbackend.exception;
 
-public class BusinessException extends RuntimeException {
-    private final int code;
+public abstract class BusinessException extends RuntimeException {
+    private final ErrorCode errorCode = ErrorCode.BAD_REQUEST;
 
-    public BusinessException(ErrorCode errorCode) {
-        super(errorCode.getMessage());
-        this.code = errorCode.getCode();
-    }
-
-    public BusinessException(int code, String message) {
-        super(message);
-        this.code = code;
+    public BusinessException(String message, Throwable cause) {
+        super(message, cause);
     }
 
     public BusinessException(String message) {
         super(message);
-        this.code = 400;
     }
 
-    public int getCode() {
-        return code;
+    public int getCode(){
+        return errorCode.getCode();
+    }
+
+    public String getCodeType(){
+        return errorCode.getMessage();
     }
 }

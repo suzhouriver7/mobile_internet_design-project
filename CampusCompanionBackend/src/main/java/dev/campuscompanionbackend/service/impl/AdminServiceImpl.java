@@ -8,7 +8,9 @@ import dev.campuscompanionbackend.enums.ContentStatus;
 import dev.campuscompanionbackend.enums.OrderStatus;
 import dev.campuscompanionbackend.enums.PostType;
 import dev.campuscompanionbackend.enums.UserType;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.ContentNotExistException;
+import dev.campuscompanionbackend.exception.OrderNotExistException;
+import dev.campuscompanionbackend.exception.UserNotExistException;
 import dev.campuscompanionbackend.repository.OrderRepository;
 import dev.campuscompanionbackend.repository.PostRepository;
 import dev.campuscompanionbackend.repository.UserRepository;
@@ -41,7 +43,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public Object getUsers(Integer page, Integer size, UserType userType) {
-        log.info("获取用户列表（管理员）: page={}, size={}, userType={}", page, size, userType);
+        log.info("管理员获取用户列表: page={}, size={}, userType={}", page, size, userType);
 
         Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<User> userPage;
@@ -91,38 +93,35 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void updateUserType(Long userId, UserType userType) {
-        log.info("修改用户权限: userId={}, userType={}", userId, userType);
-
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+                .orElseThrow(() -> new UserNotExistException("被修改的用户不存在: userId=" + userId));
 
         user.setUserType(userType);
+        log.info("修改用户权限: userId={}, userType={}", userId, userType);
         userRepository.save(user);
     }
 
     @Override
     @Transactional
     public void manageOrder(Long orderId, OrderStatus status) {
-        log.info("管理订单: orderId={}, status={}", orderId, status);
-
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new BusinessException(1005, "订单不存在"));
+                .orElseThrow(() -> new OrderNotExistException("被管理的订单不存在: orderId=" + orderId));
 
         order.setStatus(status);
         order.setUpdatedAt(LocalDateTime.now());
+        log.info("管理订单: orderId={}, status={}", orderId, status);
         orderRepository.save(order);
     }
 
     @Override
     @Transactional
     public void deleteContent(Long contentId) {
-        log.info("删除任意内容（管理员）: contentId={}", contentId);
-
         Post post = postRepository.findById(contentId)
-                .orElseThrow(() -> new BusinessException(1006, "动态不存在"));
+                .orElseThrow(() -> new ContentNotExistException("动态不存在: contentId=" + contentId));
 
         post.setStatus(ContentStatus.DELETED);
         post.setUpdatedAt(LocalDateTime.now());
+        log.info("管理员删除内容: contentId={}", contentId);
         postRepository.save(post);
     }
 
@@ -162,7 +161,7 @@ public class AdminServiceImpl implements AdminService {
         statistics.put("postCount", posts.size());
         statistics.put("commentCount", comments.size());
 
-        LocalDateTime yesterday = LocalDateTime.now().minus(1, ChronoUnit.DAYS);
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
         long todayActiveUsers = (long) (commonUserCount * 0.3);
 
         statistics.put("todayActiveUsers", todayActiveUsers);

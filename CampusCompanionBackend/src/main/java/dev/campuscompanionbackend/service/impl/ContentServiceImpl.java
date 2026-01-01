@@ -7,9 +7,11 @@ import dev.campuscompanionbackend.entity.*;
 import dev.campuscompanionbackend.enums.ContentStatus;
 import dev.campuscompanionbackend.enums.MediaType;
 import dev.campuscompanionbackend.enums.PostType;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.*;
 import dev.campuscompanionbackend.service.ContentService;
+import dev.campuscompanionbackend.service.FileService;
+import dev.campuscompanionbackend.exception.FileDeleteFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class ContentServiceImpl implements ContentService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final PostMediaRepository postMediaRepository;
+    private final FileService fileService;
 
     /**
      * 从当前 HTTP 请求头中解析出登录用户 ID。
@@ -45,18 +48,18 @@ public class ContentServiceImpl implements ContentService {
     private Long getCurrentUserIdOrThrow() {
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
         if (!(attrs instanceof ServletRequestAttributes servletAttributes)) {
-            throw new BusinessException(1001, "无法获取当前用户信息");
+            throw new ParamValidationFailedException("无法获取当前用户信息");
         }
 
         String userIdHeader = servletAttributes.getRequest().getHeader("X-User-Id");
         if (userIdHeader == null || userIdHeader.isBlank()) {
-            throw new BusinessException(1001, "未登录或用户信息缺失");
+            throw new ParamValidationFailedException("未登录或用户信息缺失");
         }
 
         try {
             return Long.parseLong(userIdHeader);
         } catch (NumberFormatException e) {
-            throw new BusinessException(1001, "用户信息格式错误");
+            throw new ParamValidationFailedException("用户信息格式错误", e);
         }
     }
 
@@ -86,9 +89,6 @@ public class ContentServiceImpl implements ContentService {
     @Override
     @Transactional
     public Long createContent(CreateContentRequest request) {
-        log.info("发布动态: content={}, mediaType={}, orderId={}",
-                request.getContent().substring(0, Math.min(50, request.getContent().length())),
-                request.getMediaType(), request.getOrderId());
 
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -108,12 +108,14 @@ public class ContentServiceImpl implements ContentService {
         }
 
         Post savedPost = postRepository.save(post);
+        log.info("发布动态: content={}, mediaType={}, orderId={}",
+                request.getContent().substring(0, Math.min(50, request.getContent().length())),
+                request.getMediaType(), request.getOrderId());
         return savedPost.getPid();
     }
 
     @Override
     public Object getContents(Integer page, Integer size, Integer type) {
-        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
 
         List<Post> posts;
         if (type != null && type == 1) {
@@ -134,6 +136,7 @@ public class ContentServiceImpl implements ContentService {
                 .map(this::convertToContentVO)
                 .collect(Collectors.toList());
 
+        log.info("获取动态列表: page={}, size={}, type={}", page, size, type);
         return new PageResponse<>(
                 contentList,
                 (long) posts.size(),
@@ -144,8 +147,6 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     public Object getContentDetail(Long contentId) {
-        log.info("获取动态详情: contentId={}", contentId);
-
         Post post = getPostById(contentId);
         Map<String, Object> contentDetail = convertToContentDetailVO(post);
 
@@ -156,23 +157,66 @@ public class ContentServiceImpl implements ContentService {
                 post, PostType.COMMENT, ContentStatus.NORMAL);
         contentDetail.put("commentCount", comments.size());
 
+        log.info("获取动态详情: contentId={}", contentId);
         return contentDetail;
     }
 
     @Override
     @Transactional
-    public void deleteContent(Long contentId) {
-        log.info("删除动态: contentId={}", contentId);
+    public Long updateContent(Long contentId, CreateContentRequest request) {
+        Post post = getPostById(contentId);
 
+        if (request.getContent() != null) {
+            post.setContent(request.getContent());
+        }
+
+        if (request.getMediaType() != null) {
+            post.setHasMedia(request.getMediaType());
+        }
+
+        if (request.getOrderId() != null) {
+            post.setOrder(getOrderById(request.getOrderId()));
+        }
+
+        post.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(post);
+
+        log.info("修改动态/评论: contentId={}", contentId);
+        return contentId;
+    }
+
+    @Override
+    @Transactional
+    public void deleteContent(Long contentId) {
         Post post = getPostById(contentId);
 
         Long currentUserId = getCurrentUserIdOrThrow();
         if (!post.getUser().getUid().equals(currentUserId)) {
-            throw new BusinessException(1004, "只有动态发布者可以删除动态");
+            throw new SomethingHappenedException(
+                    String.format("非动态发布者尝试删除动态: userId=%d, contentId=%d", post.getUser().getUid(), contentId)
+            );
         }
 
+        // 如果该动态包含媒体文件，删除这些文件并移除数据库记录
+        if (post.getHasMedia() != null && post.getHasMedia() != MediaType.TEXT_ONLY) {
+            List<PostMedia> medias = postMediaRepository.findByPost(post);
+            for (PostMedia pm : medias) {
+                try {
+                    // 物理删除文件（fileService 会根据配置定位到上传目录）
+                    fileService.deleteFile(pm.getUrl());
+                } catch (FileDeleteFailedException e) {
+                    // 记录警告但继续其他文件删除
+                    log.warn("删除媒体文件失败, pmid={}, url={}, error={}", pm.getPmid(), pm.getUrl(), e.getMessage());
+                }
+            }
+            // 从数据库中删除媒体记录
+            postMediaRepository.deleteAll(medias);
+        }
+
+        // 标记动态为已删除
         post.setStatus(ContentStatus.DELETED);
         post.setUpdatedAt(LocalDateTime.now());
+        log.info("删除动态: contentId={}", contentId);
         postRepository.save(post);
     }
 
@@ -185,7 +229,7 @@ public class ContentServiceImpl implements ContentService {
 
         String contentType = media.getContentType();
         if (contentType == null) {
-            throw new BusinessException(1007, "无法识别的文件类型");
+            throw new FileUploadFailedException("无法识别的文件类型: postId=" + contentId);
         }
 
         String uploadDir;
@@ -198,7 +242,7 @@ public class ContentServiceImpl implements ContentService {
             mediaType = MediaType.VIDEO;
             uploadDir = "uploads/videos/";
         } else {
-            throw new BusinessException(1007, "只支持图片和视频文件");
+            throw new FileUploadFailedException("不支持图片和视频以外类型的文件: contentId=" + contentId);
         }
 
         try {
@@ -233,8 +277,26 @@ public class ContentServiceImpl implements ContentService {
             return mediaUrl;
         } catch (IOException e) {
             log.error("上传媒体文件失败", e);
-            throw new BusinessException(1007, "上传媒体文件失败: " + e.getMessage());
+            throw new FileUploadFailedException("上传媒体文件失败: contentId=" + contentId, e);
         }
+    }
+
+    @Override
+    @Transactional
+    public List<PostMedia> getMedias(Long contentId) {
+        log.info("获取动态所有媒体文件: contentId={}", contentId);
+
+        Post post = getPostById(contentId);
+
+        if (post.getType() != PostType.POST) {
+            log.error("获取非动态媒体文件");
+        } else if (post.getHasMedia() == MediaType.TEXT_ONLY) {
+            log.error("获取纯文本动态媒体文件");
+        } else {
+            return postMediaRepository.findByPost(post);
+        }
+
+        return null;
     }
 
     @Override
@@ -301,9 +363,7 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     @Transactional
-    public Object likeContent(Long contentId) {
-        log.info("点赞/取消点赞: contentId={}", contentId);
-
+    public Map<String, Object> likeContent(Long contentId) {
         Post post = getPostById(contentId);
         Long currentUserId = getCurrentUserIdOrThrow();
         User currentUser = getUserById(currentUserId);
@@ -326,6 +386,7 @@ public class ContentServiceImpl implements ContentService {
         List<PostLike> likes = postLikeRepository.findByPost(post);
         result.put("count", likes.size());
 
+        log.info("点赞/取消点赞: contentId={}", contentId);
         return result;
     }
 
@@ -336,7 +397,7 @@ public class ContentServiceImpl implements ContentService {
         Post post = getPostById(contentId);
         List<PostLike> likes = postLikeRepository.findByPost(post);
 
-        List<Map<String, Object>> likeList = likes.stream()
+        return likes.stream()
                 .map(like -> {
                     Map<String, Object> userInfo = new HashMap<>();
                     userInfo.put("id", like.getUser().getUid());
@@ -345,8 +406,6 @@ public class ContentServiceImpl implements ContentService {
                     return userInfo;
                 })
                 .collect(Collectors.toList());
-
-        return likeList;
     }
 
     @Override
@@ -387,17 +446,17 @@ public class ContentServiceImpl implements ContentService {
 
     private Post getPostById(Long postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new BusinessException(1006, "动态不存在"));
+                .orElseThrow(() -> new ContentNotExistException("动态不存在: postId=" + postId));
     }
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+                .orElseThrow(() -> new UserNotExistException("用户不存在: userId=" + userId));
     }
 
     private Order getOrderById(Long orderId) {
         return orderRepository.findById(orderId)
-                .orElseThrow(() -> new BusinessException(1005, "订单不存在"));
+                .orElseThrow(() -> new OrderNotExistException("订单不存在: orderId=" + orderId));
     }
 
     private Map<String, Object> convertToContentVO(Post post) {

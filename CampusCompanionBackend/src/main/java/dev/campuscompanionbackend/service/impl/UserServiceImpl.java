@@ -5,7 +5,10 @@ import dev.campuscompanionbackend.dto.request.UpdateUserRequest;
 import dev.campuscompanionbackend.dto.response.UserInfoResponse;
 import dev.campuscompanionbackend.entity.User;
 import dev.campuscompanionbackend.enums.UserType;
-import dev.campuscompanionbackend.exception.BusinessException;
+import dev.campuscompanionbackend.exception.FileUploadFailedException;
+import dev.campuscompanionbackend.exception.ParamValidationFailedException;
+import dev.campuscompanionbackend.exception.PasswordErrorException;
+import dev.campuscompanionbackend.exception.UserNotExistException;
 import dev.campuscompanionbackend.repository.UserRepository;
 import dev.campuscompanionbackend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -32,15 +38,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserInfoResponse getUserInfo(Long userId) {
-        log.info("获取用户详情: userId={}", userId);
         User user = getUserById(userId);
+        log.info("获取用户详情: userId={}", userId);
         return convertToUserInfoResponse(user);
     }
 
     @Override
     @Transactional
     public UserInfoResponse updateUserInfo(Long userId, UpdateUserRequest request) {
-        log.info("更新用户信息: userId={}", userId);
         User user = getUserById(userId);
 
         if (request.getNickname() != null && !request.getNickname().isEmpty()) {
@@ -54,20 +59,21 @@ public class UserServiceImpl implements UserService {
         }
 
         user = userRepository.save(user);
+        log.info("更新用户信息: userId={}", userId);
         return convertToUserInfoResponse(user);
     }
 
     @Override
     @Transactional
     public void changePassword(Long userId, ChangePasswordRequest request) {
-        log.info("修改密码: userId={}", userId);
         User user = getUserById(userId);
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new BusinessException(1003, "密码错误");
+            throw new PasswordErrorException("密码错误");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        log.info("修改密码: userId={}", userId);
         userRepository.save(user);
     }
 
@@ -79,7 +85,7 @@ public class UserServiceImpl implements UserService {
 
         String contentType = avatar.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new BusinessException(1007, "请上传图片文件");
+            throw new FileUploadFailedException("请上传图片文件");
         }
 
         try {
@@ -107,7 +113,7 @@ public class UserServiceImpl implements UserService {
             return avatarUrl;
         } catch (IOException e) {
             log.error("上传头像失败", e);
-            throw new BusinessException(1007, "上传头像失败: " + e.getMessage());
+            throw new FileUploadFailedException("上传头像失败", e);
         }
     }
 
@@ -136,9 +142,16 @@ public class UserServiceImpl implements UserService {
         );
     }
 
+    @Override
+    public void resetPassword() {
+        Long uid = getCurrentUserIdOrThrow();
+        // TODO 重置密码
+
+    }
+
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(1002, "用户不存在"));
+                .orElseThrow(() -> new UserNotExistException("用户不存在: userId=" + userId));
     }
 
     private UserInfoResponse convertToUserInfoResponse(User user) {
@@ -148,6 +161,34 @@ public class UserServiceImpl implements UserService {
         response.setNickname(user.getNickname());
         response.setAvatarUrl(user.getAvatarUrl());
         response.setUserType(user.getUserType() == UserType.ADMIN ? 1 : 0);
+        // 个性签名
+        response.setSignature(user.getSignature());
+        // 创建时间转换为字符串，前端直接显示
+        if (user.getCreatedAt() != null) {
+            response.setCreatedAt(user.getCreatedAt().toString());
+        }
         return response;
+    }
+
+    /**
+     * 从当前 HTTP 请求头中解析出登录用户 ID。
+     * 前端在 axios 拦截器中会把 localStorage.userId 放到 X-User-Id 头里。
+     */
+    private Long getCurrentUserIdOrThrow() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttributes)) {
+            throw new ParamValidationFailedException("无法获取当前用户信息");
+        }
+
+        String userIdHeader = servletAttributes.getRequest().getHeader("X-User-Id");
+        if (userIdHeader == null || userIdHeader.isBlank()) {
+            throw new ParamValidationFailedException("未登录或用户信息缺失");
+        }
+
+        try {
+            return Long.parseLong(userIdHeader);
+        } catch (NumberFormatException e) {
+            throw new ParamValidationFailedException("用户信息格式错误", e);
+        }
     }
 }

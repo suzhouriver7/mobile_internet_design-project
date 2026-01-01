@@ -15,6 +15,7 @@ import java.util.List;
  * 全局异常处理
  */
 @RestControllerAdvice
+@lombok.extern.slf4j.Slf4j
 public class GlobalExceptionHandler {
 
     /**
@@ -42,7 +43,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
-        ApiResponse<Void> response = ApiResponse.error(e.getCode(), e.getMessage());
+        log.info(e.getMessage());
+        log.debug("业务异常", e);
+        String msg = e.getCodeType() + ':' + e.getMessage().split(":")[0];
+        ApiResponse<Void> response = ApiResponse.error(e.getCode(), msg);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
@@ -51,10 +55,33 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
-        e.printStackTrace();
+        log.warn("意料之外的异常!");
+        log.debug("意料之外的异常！", e);
         ApiResponse<Void> response = ApiResponse.error(
                 ErrorCode.INTERNAL_ERROR.getCode(),
                 ErrorCode.INTERNAL_ERROR.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(SomethingHappenedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleException(SomethingHappenedException e) {
+        log.warn("不愿看到的异常!");
+        log.debug("不愿看到的异常！", e);
+        ApiResponse<Void> response = ApiResponse.error(
+                ErrorCode.SOMETHING_HAPPENED.getCode(),
+                ErrorCode.SOMETHING_HAPPENED.getMessage()
+        );
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(NoPermissionException.class)
+    public ResponseEntity<ApiResponse<Void>> handleException(NoPermissionException e) {
+        log.warn("接收到不允许的操作请求!");
+        log.debug("不允许的操作请求！", e);
+        ApiResponse<Void> response = ApiResponse.error(
+                ErrorCode.SOMETHING_HAPPENED.getCode(),
+                ErrorCode.SOMETHING_HAPPENED.getMessage()
         );
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }

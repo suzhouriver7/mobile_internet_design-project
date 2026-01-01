@@ -31,3 +31,27 @@ export const refreshToken = async (refreshToken) => {
   const response = await api.post('/auth/refresh', { refreshToken })
   return response.data
 }
+
+// 忘记密码：验证邮箱是否已注册
+export const verifyEmailForReset = async (payload) => {
+  const response = await api.post('/auth/forgot/verify-email', payload)
+  return response.data
+}
+
+// 忘记密码：发送重置验证码
+export const sendResetCode = async (payload) => {
+  const response = await api.post('/auth/forgot/send-code', payload)
+  return response.data
+}
+
+// 忘记密码：校验验证码
+export const verifyResetCode = async (payload) => {
+  const response = await api.post('/auth/forgot/verify-code', payload)
+  return response.data
+}
+
+// 忘记密码：提交新密码完成重置
+export const resetPassword = async (payload) => {
+  const response = await api.post('/auth/forgot/reset-password', payload)
+  return response.data
+}

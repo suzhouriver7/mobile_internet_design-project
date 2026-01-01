@@ -1,5 +1,8 @@
 package dev.campuscompanionbackend.exception;
 
+import lombok.Getter;
+
+@Getter
 public enum ErrorCode {
     SUCCESS(200, "成功"),
     BAD_REQUEST(400, "请求参数错误"),
@@ -22,7 +25,14 @@ public enum ErrorCode {
     APPLICATION_NOT_EXIST(1013, "申请记录不存在"),
     ORDER_COMPLETED(1014, "订单已完成"),
     ORDER_CANCELLED(1015, "订单已取消"),
-    COMMENT_NOT_EXIST(1016, "评论不存在");
+    COMMENT_NOT_EXIST(1016, "评论不存在"),
+    EMAIL_INVALID(1017,"非法的邮箱地址"),
+    VERIFY_CODE_ERROR(1018, "验证码错误"),
+    FILE_DELETE_FAILED(1019, "文件删除失败"),
+    REGISTER_FAILED(1020, "注册失败"),
+    AI_FAILED(1021, "AI调用异常"),
+    SOMETHING_HAPPENED(1000, "出现了一些小问题"),
+    ;
 
     private final int code;
     private final String message;
@@ -32,11 +42,4 @@ public enum ErrorCode {
         this.message = message;
     }
 
-    public int getCode() {
-        return code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
 }

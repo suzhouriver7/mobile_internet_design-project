@@ -127,3 +127,14 @@ CREATE TABLE IF NOT EXISTS post_likes
     FOREIGN KEY (uid) REFERENCES users (uid) ON DELETE CASCADE,
     UNIQUE KEY uk_pid_uid (pid, uid)
 ) COMMENT = '动态/评论点赞表';
+
+CREATE TABLE IF NOT EXISTS verify_code_record
+(
+    vid           BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '验证码记录唯一ID',
+    email         VARCHAR(100) NOT NULL COMMENT '接受验证码的邮箱',
+    code          VARCHAR(10)  NOT NULL COMMENT '验证码',
+    type          ENUM ('REGISTER', 'LOGIN', 'FORGET_PWD', 'BIND_PHONE', 'BIND_EMAIL') NOT NULL COMMENT '验证码用途',
+    status        ENUM ('UNUSED', 'USED', 'EXPIRED') NOT NULL DEFAULT 'UNUSED' COMMENT '验证码状态',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
+    expired_at    DATETIME     NOT NULL COMMENT '过期时间（如5分钟后）'
+) COMMENT = '用户验证码表';

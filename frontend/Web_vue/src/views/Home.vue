@@ -115,7 +115,7 @@
 
     <!-- 底部：动态流 -->
     <div class="content-list">
-      <el-card v-for="content in contents" :key="content.id" class="content-item">
+      <el-card v-for="content in contents" :key="content.id" class="content-item" @click="handleComment(content.id)">
         <div class="content-header">
           <div class="user-info">
             <el-avatar :src="content.user.avatarUrl" size="small">
@@ -132,12 +132,12 @@
           </div>
         </div>
         <div class="content-footer">
-          <div class="action-item" @click="handleLike(content.id)">
-            <el-icon v-if="content.liked"><StarFilled /></el-icon>
-            <el-icon v-else><Star /></el-icon>
-            <span>{{ content.likeCount }}</span>
-          </div>
-          <div class="action-item" @click="handleComment(content.id)">
+            <div class="action-item" @click.stop="handleLike(content.id)">
+              <el-icon v-if="content.liked"><ThumbFilled /></el-icon>
+              <el-icon v-else><ThumbOutline /></el-icon>
+              <span>{{ content.likeCount }}</span>
+            </div>
+          <div class="action-item" @click.stop="handleComment(content.id)">
             <el-icon><ChatDotRound /></el-icon>
             <span>{{ content.commentCount }}</span>
           </div>
@@ -163,7 +163,9 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { StarFilled, Star, ChatDotRound } from '@element-plus/icons-vue'
+import { ChatDotRound } from '@element-plus/icons-vue'
+import ThumbFilled from '../components/ThumbFilled.vue'
+import ThumbOutline from '../components/ThumbOutline.vue'
 import { useAuthStore } from '../stores/auth'
 import { useContentStore } from '../stores/content'
 import { useOrderStore } from '../stores/order'
@@ -299,8 +301,73 @@ const fetchContents = async () => {
       return item
     })
 
-    contents.value = list
-    total.value = serverData.total || list.length
+    // 只展示：1) 我自己发布的动态 2) 别人回复我的动态（回复我的评论）
+    if (!currentUserId.value) {
+      // 未登录时不展示个人相关流
+      contents.value = []
+      total.value = 0
+      return
+    }
+
+    const filtered = []
+
+    const tasks = list.map(async (item) => {
+      try {
+        // 我自己的动态直接加入
+        if (item.user && item.user.id === currentUserId.value) {
+          filtered.push(item)
+          return
+        }
+
+        // 对于非自己发布的动态，检查是否有人回复了我的评论（需要拉评论列表）
+        const resp = await contentStore.getComments(item.id, { page: 1, size: 200 })
+        const comments = resp.data?.data?.list || []
+
+        // 建立 id -> comment 映射，方便通过 parentId 查找父评论
+        const map = new Map()
+        comments.forEach((c) => {
+          if (c && c.id != null) map.set(c.id, c)
+        })
+
+        let matched = false
+        for (const c of comments) {
+          if (!c) continue
+          // 有 parentId 且父评论作者是当前用户，说明这是别人回复我的评论
+          if (c.parentId) {
+            const parent = map.get(c.parentId)
+            if (parent && parent.user && parent.user.id === currentUserId.value) {
+              matched = true
+              break
+            }
+          }
+          // 另外考虑嵌套 replies 情况（若后端返回嵌套结构且未设置 parentId），也递归检查
+          const stack = (c.replies && Array.isArray(c.replies)) ? [...c.replies] : []
+          while (stack.length) {
+            const child = stack.pop()
+            if (!child) continue
+            if (child.parentId) {
+              const parent = map.get(child.parentId)
+              if (parent && parent.user && parent.user.id === currentUserId.value) {
+                matched = true
+                break
+              }
+            }
+            if (child.replies && child.replies.length) stack.push(...child.replies)
+          }
+          if (matched) break
+        }
+
+        if (matched) filtered.push(item)
+      } catch (e) {
+        // 单条评论拉取失败时忽略该动态，避免影响整体体验
+        console.error('检查动态评论是否回复当前用户失败', item.id, e)
+      }
+    })
+
+    await Promise.all(tasks)
+
+    contents.value = filtered
+    total.value = filtered.length
   } catch (error) {
     ElMessage.error(error.message || '获取动态列表失败')
   }

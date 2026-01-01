@@ -5,7 +5,7 @@ import logger from './logger'
 const instance = axios.create({
   // 默认使用相对路径，配合 Vite 代理或同源部署，避免跨域和协议混用问题
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 10000, // 请求超时时间
+  timeout: 300000, // 请求超时时间（5 分钟），增加以支撑较长的 AI 返回
   headers: {
     'Content-Type': 'application/json'
   }

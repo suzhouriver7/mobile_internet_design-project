@@ -291,7 +291,17 @@
             <template #header>
               <div class="card-header">
                 <span>申请信息</span>
-                <span class="apply-count">共 {{ applications.length }} 人申请</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="apply-count">共 {{ applications.length }} 人申请</span>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :disabled="isApplyDisabled(order)"
+                    @click="handleApplyOrder"
+                  >
+                    {{ getApplyButtonText(order) }}
+                  </el-button>
+                </div>
               </div>
             </template>
             <div v-if="applications.length > 0" class="applications-list">
@@ -551,6 +561,94 @@ const isPendingApply = (apply) => {
 // 是否可以显示“撤销申请”按钮
 const canCancelApply = (apply) => {
   return isMyApplication(apply) && isPendingApply(apply) && order.value?.status === 'PENDING'
+}
+
+// ----- 与 OrdersView 复用的申请/操作逻辑 -----
+const hasApplied = computed(() => {
+  if (!Array.isArray(applications.value) || !currentUserId.value) return false
+  return applications.value.some(a => a.user && a.user.id === currentUserId.value && a.status !== 'CANCELLED_APPLY')
+})
+
+const isApplyDisabled = (o) => {
+  const ord = o || order.value
+  if (!ord) return true
+  // 发布者：仅在订单为待匹配时允许“取消订单”操作
+  if (isPublisher.value) {
+    if (ord.status === 'CANCELLED') return true
+    return ord.status !== 'PENDING'
+  }
+
+  // 非发布者：已申请、已过期、人数已满或非待匹配状态都不允许申请
+  if (hasApplied.value) return true
+  if (ord.status === 'EXPIRED') return true
+  if ((ord.currentPeople || 0) >= (ord.maxPeople || 0)) return true
+  if (ord.status !== 'PENDING') return true
+  return false
+}
+
+const getApplyButtonText = (o) => {
+  const ord = o || order.value
+  if (!ord) return '申请'
+
+  // 发布者侧文案
+  if (isPublisher.value) {
+    if (ord.status === 'CANCELLED') return '已取消'
+    if (ord.status !== 'PENDING') return '不可操作'
+    return '取消订单'
+  }
+
+  // 已申请
+  if (hasApplied.value) return '已申请'
+
+  if (ord.status === 'EXPIRED') return '已过期'
+  if (ord.status === 'IN_PROGRESS') return '进行中'
+  if (ord.status === 'COMPLETED') return '已完成'
+  if (ord.status === 'CANCELLED') return '已取消'
+
+  if ((ord.currentPeople || 0) >= (ord.maxPeople || 0)) return '人数已满'
+
+  if (ord.status === 'PENDING') return '申请'
+
+  return '不可申请'
+}
+
+const handleApplyOrder = async () => {
+  if (!order.value?.id) return
+
+  // 发布者点击：执行“取消订单”逻辑
+  if (isPublisher.value) {
+    if (order.value.status === 'CANCELLED') return
+    try {
+      await ElMessageBox.confirm(
+        '确定要取消此订单吗？此操作不可撤销。',
+        '取消订单确认',
+        {
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          type: 'warning',
+          draggable: true
+        }
+      )
+      await orderStore.deleteOrder(order.value.id)
+      ElMessage.success('订单已取消')
+      router.back()
+    } catch (error) {
+      if (error === 'cancel' || error === 'close') return
+      ElMessage.error(error?.message || '取消订单失败')
+    }
+    return
+  }
+
+  // 非发布者：申请逻辑
+  if (isApplyDisabled(order.value)) return
+  try {
+    await orderStore.applyOrder(order.value.id)
+    ElMessage.success('申请成功')
+    // 重新加载详情，更新申请列表与人数
+    await loadDetail()
+  } catch (error) {
+    ElMessage.error(error?.message || '申请失败')
+  }
 }
 
 // 发布者是否可以对该申请进行审核

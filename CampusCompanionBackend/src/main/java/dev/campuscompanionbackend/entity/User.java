@@ -45,5 +45,5 @@ public class User {
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
-    private LocalDateTime lastLoginAt;
+    private LocalDateTime lastLoginAt = LocalDateTime.now();
 }

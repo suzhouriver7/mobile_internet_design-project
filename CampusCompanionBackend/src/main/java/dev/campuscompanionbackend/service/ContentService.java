@@ -2,7 +2,11 @@ package dev.campuscompanionbackend.service;
 
 import dev.campuscompanionbackend.dto.request.CreateCommentRequest;
 import dev.campuscompanionbackend.dto.request.CreateContentRequest;
+import dev.campuscompanionbackend.entity.PostMedia;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * 动态服务接口
@@ -31,6 +35,14 @@ public interface ContentService {
      * @return Object 动态详情
      */
     Object getContentDetail(Long contentId);
+
+    /**
+     * 修改动态内容
+     * @param contentId 动态ID
+     * @param request 修改动态请求参数
+     * @return Long 动态ID
+     */
+    Long updateContent(Long contentId, CreateContentRequest request);
     
     /**
      * 删除动态
@@ -45,6 +57,13 @@ public interface ContentService {
      * @return String 媒体文件URL
      */
     String uploadMedia(Long contentId, MultipartFile media);
+
+    /**
+     * 获取动态所有媒体文件
+     * @param contentId 动态ID
+     * @return List<PostMedia> 所有媒体文件
+     */
+    List<PostMedia> getMedias(Long contentId);
     
     /**
      * 发布评论
@@ -62,13 +81,13 @@ public interface ContentService {
      * @return Object 分页评论列表
      */
     Object getComments(Long contentId, Integer page, Integer size);
-    
+
     /**
      * 点赞/取消点赞
      * @param contentId 内容ID
-     * @return Object 包含点赞状态和点赞数
+     * @return Map<String, Object> 包含点赞状态和点赞数
      */
-    Object likeContent(Long contentId);
+    Map<String, Object> likeContent(Long contentId);
     
     /**
      * 获取点赞列表
