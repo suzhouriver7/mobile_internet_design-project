@@ -368,6 +368,67 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     @Transactional
+    public void deleteComment(Long commentId) {
+        Post comment = getPostById(commentId);
+
+        if (comment.getType() != PostType.COMMENT) {
+            throw new ParamValidationFailedException("目标不是评论: commentId=" + commentId);
+        }
+
+        Long currentUserId = getCurrentUserIdOrThrow();
+        User currentUser = getUserById(currentUserId);
+
+        boolean isOwner = comment.getUser().getUid().equals(currentUserId);
+        boolean isAdmin = currentUser.getUserType() == UserType.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new SomethingHappenedException(
+                    String.format("无权删除评论: operatorId=%d, ownerId=%d, commentId=%d",
+                            currentUserId, comment.getUser().getUid(), commentId)
+            );
+        }
+
+        log.info("删除评论及其子评论: commentId={}, operatorId={}, isAdmin={}",
+                commentId, currentUserId, isAdmin);
+
+        deleteCommentRecursive(comment);
+    }
+
+    /**
+     * 递归删除评论树：
+     * - 标记当前评论为 DELETED
+     * - 删除其下所有子评论（同样标记为 DELETED）
+     * - 如评论包含媒体文件，则一并删除物理文件及媒资记录
+     */
+    private void deleteCommentRecursive(Post comment) {
+        // 先删除所有子评论
+        List<Post> childComments = postRepository.findByParentPostAndTypeAndStatusOrderByCreatedAtDesc(
+                comment, PostType.COMMENT, ContentStatus.NORMAL);
+        for (Post child : childComments) {
+            deleteCommentRecursive(child);
+        }
+
+        // 如果这条评论带有媒体文件（目前评论一般为纯文本，这里做防御性处理）
+        if (comment.getHasMedia() != null && comment.getHasMedia() != MediaType.TEXT_ONLY) {
+            List<PostMedia> medias = postMediaRepository.findByPost(comment);
+            for (PostMedia pm : medias) {
+                try {
+                    fileService.deleteFile(pm.getUrl());
+                } catch (FileDeleteFailedException e) {
+                    log.warn("删除评论媒体文件失败, pmid={}, url={}, error={}",
+                            pm.getPmid(), pm.getUrl(), e.getMessage());
+                }
+            }
+            postMediaRepository.deleteAll(medias);
+        }
+
+        // 标记评论为已删除
+        comment.setStatus(ContentStatus.DELETED);
+        comment.setUpdatedAt(LocalDateTime.now());
+        postRepository.save(comment);
+    }
+
+    @Override
+    @Transactional
     public Map<String, Object> likeContent(Long contentId) {
         Post post = getPostById(contentId);
         Long currentUserId = getCurrentUserIdOrThrow();

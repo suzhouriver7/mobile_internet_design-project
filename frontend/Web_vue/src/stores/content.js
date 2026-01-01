@@ -125,6 +125,24 @@ export const useContentStore = defineStore('content', {
       }
     },
 
+    async deleteComment(commentId) {
+      this.loading = true
+      try {
+        const response = await api.delete(`/contents/comments/${commentId}`)
+        logger.event('CONTENT_COMMENT_DELETED', { commentId })
+        return response
+      } catch (error) {
+        logger.error('CONTENT_COMMENT_DELETE_FAILED', {
+          commentId,
+          message: error.response?.data?.message || error.message,
+          status: error.response?.status
+        })
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async getComments(contentId, params) {
       this.loading = true
       try {

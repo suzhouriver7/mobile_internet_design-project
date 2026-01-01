@@ -83,6 +83,14 @@ public interface ContentService {
     Object getComments(Long contentId, Integer page, Integer size);
 
     /**
+     * 删除评论（包含其所有子评论）
+     *
+     * 只有评论作者本人或管理员可以删除。
+     * @param commentId 评论ID
+     */
+    void deleteComment(Long commentId);
+
+    /**
      * 点赞/取消点赞
      * @param contentId 内容ID
      * @return Map<String, Object> 包含点赞状态和点赞数
