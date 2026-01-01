@@ -10,6 +10,8 @@ import dev.campuscompanionbackend.enums.PostType;
 import dev.campuscompanionbackend.exception.*;
 import dev.campuscompanionbackend.repository.*;
 import dev.campuscompanionbackend.service.ContentService;
+import dev.campuscompanionbackend.service.FileService;
+import dev.campuscompanionbackend.exception.FileDeleteFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class ContentServiceImpl implements ContentService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final PostMediaRepository postMediaRepository;
+    private final FileService fileService;
 
     /**
      * 从当前 HTTP 请求头中解析出登录用户 ID。
@@ -194,6 +197,23 @@ public class ContentServiceImpl implements ContentService {
             );
         }
 
+        // 如果该动态包含媒体文件，删除这些文件并移除数据库记录
+        if (post.getHasMedia() != null && post.getHasMedia() != MediaType.TEXT_ONLY) {
+            List<PostMedia> medias = postMediaRepository.findByPost(post);
+            for (PostMedia pm : medias) {
+                try {
+                    // 物理删除文件（fileService 会根据配置定位到上传目录）
+                    fileService.deleteFile(pm.getUrl());
+                } catch (FileDeleteFailedException e) {
+                    // 记录警告但继续其他文件删除
+                    log.warn("删除媒体文件失败, pmid={}, url={}, error={}", pm.getPmid(), pm.getUrl(), e.getMessage());
+                }
+            }
+            // 从数据库中删除媒体记录
+            postMediaRepository.deleteAll(medias);
+        }
+
+        // 标记动态为已删除
         post.setStatus(ContentStatus.DELETED);
         post.setUpdatedAt(LocalDateTime.now());
         log.info("删除动态: contentId={}", contentId);

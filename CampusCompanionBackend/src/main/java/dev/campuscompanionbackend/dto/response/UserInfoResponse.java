@@ -32,4 +32,14 @@ public class UserInfoResponse {
      * 用户类型
      */
     private Integer userType;
+
+    /**
+     * 个性签名
+     */
+    private String signature;
+
+    /**
+     * 创建时间（ISO 字符串）
+     */
+    private String createdAt;
 }

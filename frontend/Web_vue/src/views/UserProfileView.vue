@@ -131,143 +131,7 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- 隐私与权限 -->
-        <el-tab-pane label="隐私设置" name="privacy">
-          <div class="section-description">
-            <p>控制哪些信息对其他用户可见，保护你的个人隐私。</p>
-          </div>
-          <div class="settings-group">
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>对他人显示邮箱</h4>
-                <p>关闭后，其他用户将无法在你的资料页看到邮箱信息。</p>
-              </div>
-              <el-switch v-model="privacySettings.showEmail" />
-            </div>
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>允许陌生人发起消息</h4>
-                <p>关闭后，仅与你有订单关系的用户可以向你发消息。</p>
-              </div>
-              <el-switch v-model="privacySettings.allowMessages" />
-            </div>
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>允许在用户搜索中展示</h4>
-                <p>关闭后，你的账号将不会出现在“搜索用户”的结果中。</p>
-              </div>
-              <el-switch v-model="privacySettings.showInSearch" />
-            </div>
-            <div class="settings-actions">
-              <el-button type="primary" @click="savePrivacySettings">保存设置</el-button>
-            </div>
-          </div>
-        </el-tab-pane>
-
-        <!-- 消息通知 -->
-        <el-tab-pane label="消息通知" name="notification">
-          <div class="section-description">
-            <p>配置你希望接收的通知类型，避免被无关消息打扰。</p>
-          </div>
-          <div class="settings-group">
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>订单动态通知</h4>
-                <p>包括订单申请、状态变更等提醒。</p>
-              </div>
-              <el-switch v-model="notificationSettings.orderUpdates" />
-            </div>
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>动态互动通知</h4>
-                <p>包括有人点赞或评论你的动态时的提醒。</p>
-              </div>
-              <el-switch v-model="notificationSettings.contentUpdates" />
-            </div>
-            <div class="settings-item">
-              <div class="settings-text">
-                <h4>系统公告通知</h4>
-                <p>包括重要更新、维护公告等消息。</p>
-              </div>
-              <el-switch v-model="notificationSettings.systemNotices" />
-            </div>
-            <div class="settings-actions">
-              <el-button type="primary" @click="saveNotificationSettings">保存设置</el-button>
-            </div>
-          </div>
-        </el-tab-pane>
-
-        <!-- 收藏与历史 -->
-        <el-tab-pane label="收藏与历史" name="collections">
-          <el-row :gutter="20" class="collections-row">
-            <el-col :xs="24" :sm="12">
-              <el-card class="sub-card" shadow="hover">
-                <div class="sub-card-header">
-                  <h3>我的收藏</h3>
-                  <span class="sub-card-desc">你关注的订单或动态会显示在这里</span>
-                </div>
-                <div v-if="favoriteItems.length === 0" class="empty-wrap">
-                  <el-empty description="暂无收藏" />
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :xs="24" :sm="12">
-              <el-card class="sub-card" shadow="hover">
-                <div class="sub-card-header">
-                  <h3>最近浏览</h3>
-                  <span class="sub-card-desc">你最近查看过的订单或动态</span>
-                </div>
-                <div v-if="historyItems.length === 0" class="empty-wrap">
-                  <el-empty description="暂无浏览记录" />
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </el-tab-pane>
-
-        <!-- 帮助与反馈 -->
-        <el-tab-pane label="帮助与反馈" name="help">
-          <el-row :gutter="20" class="help-row">
-            <el-col :xs="24" :md="12">
-              <el-card class="sub-card" shadow="never">
-                <h3>常见问题</h3>
-                <ul class="faq-list">
-                  <li>· 如何创建和管理预约订单？</li>
-                  <li>· 被别人申请订单后如何沟通？</li>
-                  <li>· 如何修改个人资料和头像？</li>
-                  <li>· 忘记密码了怎么办？</li>
-                </ul>
-                <p class="faq-tip">更多详细说明将陆续完善，敬请期待。</p>
-              </el-card>
-            </el-col>
-            <el-col :xs="24" :md="12">
-              <el-card class="sub-card" shadow="never">
-                <h3>意见反馈</h3>
-                <el-form :model="feedbackForm" label-width="80px" class="feedback-form">
-                  <el-form-item label="反馈内容">
-                    <el-input
-                      v-model="feedbackForm.content"
-                      type="textarea"
-                      :rows="4"
-                      maxlength="500"
-                      show-word-limit
-                      placeholder="使用过程中遇到的问题或建议，都可以告诉我们"
-                    />
-                  </el-form-item>
-                  <el-form-item label="联系方式">
-                    <el-input
-                      v-model="feedbackForm.contact"
-                      placeholder="可选，方便我们与你取得联系（邮箱/微信等）"
-                    />
-                  </el-form-item>
-                  <el-form-item>
-                    <el-button type="primary" @click="handleSubmitFeedback">提交反馈</el-button>
-                  </el-form-item>
-                </el-form>
-              </el-card>
-            </el-col>
-          </el-row>
-        </el-tab-pane>
+        <!-- 仅保留核心：基本信息与账户安全 -->
       </el-tabs>
     </el-card>
   </div>
@@ -319,53 +183,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-const privacySettings = reactive({
-  showEmail: true,
-  allowMessages: true,
-  showInSearch: true
-})
-
-const notificationSettings = reactive({
-  orderUpdates: true,
-  contentUpdates: true,
-  systemNotices: true
-})
-
-const favoriteItems = ref([])
-const historyItems = ref([])
-
-const feedbackForm = reactive({
-  content: '',
-  contact: ''
-})
-
-const PRIVACY_KEY = 'cc_privacy_settings'
-const NOTIFY_KEY = 'cc_notification_settings'
-
-const loadLocalSettings = () => {
-  try {
-    const savedPrivacy = localStorage.getItem(PRIVACY_KEY)
-    if (savedPrivacy) {
-      Object.assign(privacySettings, JSON.parse(savedPrivacy))
-    }
-    const savedNotify = localStorage.getItem(NOTIFY_KEY)
-    if (savedNotify) {
-      Object.assign(notificationSettings, JSON.parse(savedNotify))
-    }
-  } catch (e) {
-    console.error('加载本地设置失败', e)
-  }
-}
-
-const savePrivacySettings = () => {
-  localStorage.setItem(PRIVACY_KEY, JSON.stringify(privacySettings))
-  ElMessage.success('隐私设置已保存')
-}
-
-const saveNotificationSettings = () => {
-  localStorage.setItem(NOTIFY_KEY, JSON.stringify(notificationSettings))
-  ElMessage.success('通知设置已保存')
-}
+// 已移除：隐私设置、通知设置、收藏/历史、帮助反馈等未实现后端依赖功能
 
 const fillEditableFromUser = () => {
   if (!currentUser.value) return
@@ -503,18 +321,7 @@ const handleChangePassword = async () => {
   }
 }
 
-const handleSubmitFeedback = () => {
-  if (!feedbackForm.content.trim()) {
-    ElMessage.error('请先填写反馈内容')
-    return
-  }
-  ElMessage.success('感谢你的反馈，我们会尽快查看')
-  feedbackForm.content = ''
-  feedbackForm.contact = ''
-}
-
 onMounted(async () => {
-  loadLocalSettings()
   await initUser()
 })
 </script>

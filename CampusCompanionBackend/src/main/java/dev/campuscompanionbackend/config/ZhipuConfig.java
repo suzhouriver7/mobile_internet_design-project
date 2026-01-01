@@ -11,5 +11,5 @@ public class ZhipuConfig {
     private String apiKey;
     private String baseUrl = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
     private String model = "glm-4-flash-250414";
-    private int timeout = 30000;
+    private int timeout = 120000;
 }

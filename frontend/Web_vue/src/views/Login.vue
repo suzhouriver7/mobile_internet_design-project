@@ -56,7 +56,9 @@ const loginRules = {
 const handleLogin = async () => {
   try {
     await authStore.login(loginForm)
-    await router.push('/')
+    // 登录成功后回跳到最初请求页面（若有）
+    const redirect = router.currentRoute.value.query.redirect || '/'
+    await router.push(redirect)
   } catch (error) {
     ElMessage.error(error.message || '登录失败')
   }

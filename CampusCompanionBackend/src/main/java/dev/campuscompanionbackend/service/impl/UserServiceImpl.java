@@ -161,6 +161,12 @@ public class UserServiceImpl implements UserService {
         response.setNickname(user.getNickname());
         response.setAvatarUrl(user.getAvatarUrl());
         response.setUserType(user.getUserType() == UserType.ADMIN ? 1 : 0);
+        // 个性签名
+        response.setSignature(user.getSignature());
+        // 创建时间转换为字符串，前端直接显示
+        if (user.getCreatedAt() != null) {
+            response.setCreatedAt(user.getCreatedAt().toString());
+        }
         return response;
     }
 

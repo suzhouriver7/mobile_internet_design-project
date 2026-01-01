@@ -45,14 +45,21 @@
         </div>
         <div class="user-info">
           <el-dropdown v-if="isAuthenticated">
-            <span class="el-dropdown-link">
-              {{ (userInfo && userInfo.nickname) || '用户' }} <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            <span class="el-dropdown-link user-dropdown">
+              <template v-if="navAvatarUrl">
+                <img :src="navAvatarUrl" @error="onNavAvatarError" loading="lazy" alt="avatar" class="nav-avatar-img" width="32" height="32" />
+              </template>
+              <template v-else>
+                <el-avatar :size="32" class="nav-avatar-fallback">{{ userInitial }}</el-avatar>
+              </template>
+              <span class="nav-nickname">{{ (userInfo && userInfo.nickname) || '用户' }}</span>
+              <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item><router-link to="/user/profile">个人中心</router-link></el-dropdown-item>
-                <el-dropdown-item><router-link to="/orders/create">发布订单</router-link></el-dropdown-item>
-                <el-dropdown-item><router-link to="/contents/create">发布动态</router-link></el-dropdown-item>
+                <el-dropdown-item><router-link to="/user/profile" style="color:#222; text-decoration:none">个人中心</router-link></el-dropdown-item>
+                <el-dropdown-item><router-link to="/orders/create" style="color:#222; text-decoration:none">发布订单</router-link></el-dropdown-item>
+                <el-dropdown-item><router-link to="/contents/create" style="color:#222; text-decoration:none">发布动态</router-link></el-dropdown-item>
                 <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -84,13 +91,46 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { ArrowDown, Menu as MenuIcon } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 计算用户认证状态（提前定义，供后续 avatar 处理使用）
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+// 直接返回 store 中的用户对象，便于判断是否需要拉取用户信息
+const userInfo = computed(() => authStore.user)
+
+// navigation avatar handling
+const navAvatarUrl = ref(null)
+const navAvatarError = ref(false)
+const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+
+const resolveUrl = (url) => {
+  if (!url) return null
+  if (/^https?:\/\//.test(url)) return url
+  return `${fileBaseUrl}${url}`
+}
+
+const userInitial = computed(() => {
+  const u = userInfo.value
+  if (u?.nickname) return u.nickname.slice(0, 1)
+  if (u?.email) return u.email.slice(0, 1).toUpperCase()
+  return '用'
+})
+
+watch(userInfo, (val) => {
+  navAvatarError.value = false
+  navAvatarUrl.value = val?.avatarUrl ? resolveUrl(val.avatarUrl) : null
+}, { immediate: true })
+
+const onNavAvatarError = () => {
+  navAvatarError.value = true
+  navAvatarUrl.value = null
+}
 
 // 计算当前激活的菜单索引（使用路径，配合 el-menu 的 router 模式）
 const activeIndex = computed(() => {
@@ -101,10 +141,6 @@ const activeIndex = computed(() => {
   return '/'
 })
 
-// 计算用户认证状态
-const isAuthenticated = computed(() => authStore.isAuthenticated)
-// 直接返回 store 中的用户对象，便于判断是否需要拉取用户信息
-const userInfo = computed(() => authStore.user)
 
 // 处理菜单选择（此处仅做调试/埋点，实际导航由 el-menu 的 router 属性完成）
 const handleSelect = (key, keyPath) => {
@@ -191,6 +227,14 @@ body {
       &:hover {
         color: #66b1ff;
       }
+      .ai-quick {
+        margin-left: 12px;
+        font-size: 14px;
+        color: #606266;
+        text-decoration: none;
+        padding: 6px 8px;
+        border-radius: 6px;
+      }
     }
   }
   
@@ -236,9 +280,35 @@ body {
       cursor: pointer;
       color: #606266;
       transition: color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       
       &:hover {
         color: #409eff;
+      }
+    }
+
+    .user-dropdown {
+      .nav-avatar-img {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        border-radius: 50%;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .nav-avatar-fallback {
+        background-color: #f0f2f5;
+        color: #606266;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .nav-nickname {
+        margin: 0 6px;
+        font-size: 14px;
+        color: #606266;
       }
     }
     
@@ -269,6 +339,16 @@ body {
         &:hover {
           background-color: #66b1ff;
         }
+      }
+    }
+    // 覆盖下拉菜单项颜色为深色，避免默认蓝色链接样式
+    .el-dropdown-menu {
+      .el-dropdown-item {
+        color: #222 !important;
+      }
+      a {
+        color: inherit !important;
+        text-decoration: none;
       }
     }
   }
