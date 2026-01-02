@@ -9,31 +9,32 @@
 项目中与 Docker 相关的主要文件：
 
 - `docker-compose.yml`
+
   - 位于项目根目录。
   - 定义三类服务：
     - `db`：MySQL 8.0 数据库服务；
     - `backend`：后端 Spring Boot 服务（CampusCompanionBackend）；
     - `frontend`：前端 Vue 应用（frontend/Web_vue），通过 Nginx 提供静态页并反向代理到后端。
   - 管理服务之间的依赖关系、端口映射和持久化卷（`db_data`）。
-
 - `CampusCompanionBackend/Dockerfile`
+
   - 后端服务的镜像构建脚本，多阶段构建：
     - 使用 `maven:3.9.9-eclipse-temurin-21` 进行 `mvn clean package -DskipTests` 打包；
     - 使用 `eclipse-temurin:21-jre` 作为运行时镜像，复制打好的 JAR 并以 `java -jar app.jar` 运行；
     - 暴露端口 `8080`。
-
 - `frontend/Web_vue/Dockerfile`
+
   - 前端服务的镜像构建脚本，同样采用多阶段构建：
     - 构建阶段：基于 `node:20-alpine`，安装依赖并执行 `npm run build` 生成 `dist`；
     - 运行阶段：基于 `nginx:1.27-alpine`，将 `dist` 拷贝到 `/usr/share/nginx/html`，并使用自定义 `nginx.conf`；
     - 暴露端口 `80`，在 docker-compose 中映射为宿主 `8081`。
-
 - `frontend/Web_vue/nginx.conf`
+
   - Nginx 配置文件，用于：
     - 提供前端静态资源；
     - 将前端对 `/api` 的请求反向代理到后端（`backend` 服务），确保前端 axios 使用 `/api/v1` 时无需关心后端具体地址。
-
 - `docs/SystemAnalysis/create.sql`
+
   - MySQL 初始化脚本：
     - 在第一次启动数据库且数据目录为空时，自动创建 `campus_companion` 数据库及所有表（users、orders、posts、verify_code_record 等）；
     - 授权和 root 密码由 docker-compose 中的 `MYSQL_ROOT_PASSWORD` 等环境变量控制。
@@ -121,10 +122,11 @@ docker compose up -d
 在 `docker-compose.yml` 中：
 
 - `db` 服务：
+
   - `MYSQL_ROOT_PASSWORD`: MySQL root 用户密码（当前为 `879879`）；
   - `MYSQL_DATABASE`: 初始数据库名（`campus_companion`）。
-
 - `backend` 服务：
+
   - `SPRING_DATASOURCE_URL`: `jdbc:mysql://db:3306/campus_companion?...`，指向 `db` 服务；
   - `SPRING_DATASOURCE_USERNAME`: `root`；
   - `SPRING_DATASOURCE_PASSWORD`: `879879`；
@@ -134,6 +136,7 @@ docker compose up -d
   - `SPRING_MAIL_*`: 邮件服务器配置（目前配置为 163 邮箱，需要对应账号支持）。
 
 > 如需修改数据库密码或 JWT 等敏感值，建议同时修改：
+>
 > - `docker-compose.yml` 中的环境变量；
 > - 后端开发环境的 `application.properties` 或本地运行时的环境变量。
 
@@ -331,7 +334,7 @@ netstat -ano | findstr :8081
 
 **现象**：
 
-- 容器重启后数据“清空”；
+- 容器重启后数据“清空；
 - 或后端启动时报无法连到数据库。
 
 **排查步骤**：
@@ -355,11 +358,3 @@ docker compose logs -f db
 ```
 
 4. 若数据确实已丢失，说明可能执行过 `docker compose down -v`，需重新执行初始化脚本（会自动执行 `create.sql`）。
-
----
-
-## 6. 总结
-
-- 本项目已提供完整的 Docker 化配置，推荐使用 `docker compose up --build` 一键启动；
-- 日常开发时，可只针对修改的服务执行 `docker compose build backend/frontend`，减少不必要的构建时间；
-- 遇到问题时，优先查看 `docker compose logs`，多数错误可通过检查数据库初始化、CORS 配置和端口占用快速定位。

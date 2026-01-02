@@ -37,7 +37,7 @@ services:
       - "8080:8080"
 
   frontend:
-    build: ./frontend/Web_vue
+    build: ./CampusCompanionWeb
     container_name: campus_frontend
     restart: unless-stopped
     depends_on:
