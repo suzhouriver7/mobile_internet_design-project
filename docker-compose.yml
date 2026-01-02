@@ -15,6 +15,7 @@ services:
     command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
 
   backend:
+    image: mobile_internet-project-backend:latest
     build: ./CampusCompanionBackend
     container_name: campus_backend
     restart: unless-stopped
@@ -37,6 +38,7 @@ services:
       - "8080:8080"
 
   frontend:
+    image: mobile_internet-project-frontend:latest
     build: ./CampusCompanionWeb
     container_name: campus_frontend
     restart: unless-stopped
