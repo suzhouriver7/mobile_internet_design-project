@@ -107,7 +107,8 @@ const userInfo = computed(() => authStore.user)
 // navigation avatar handling
 const navAvatarUrl = ref(null)
 const navAvatarError = ref(false)
-const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+const fileBaseUrl =
+  import.meta.env.VITE_FILE_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 
 const resolveUrl = (url) => {
   if (!url) return null

@@ -10,7 +10,7 @@
         :rules="loginRules"
         label-position="top"
       >
-        <el-form-item label="学号/邮箱" prop="identifier">
+        <el-form-item label="邮箱" prop="identifier">
           <el-input v-model="loginForm.identifier" placeholder="请输入学号或邮箱" />
         </el-form-item>
         <el-form-item label="密码" prop="password">

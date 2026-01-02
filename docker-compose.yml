@@ -1,0 +1,52 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: campus_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 879879
+      MYSQL_DATABASE: campus_companion
+    ports:
+      - "33306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # 使用初始化脚本创建数据库和表结构（只在数据目录为空的第一次生效）
+      - ./docs/SystemAnalysis/create.sql:/docker-entrypoint-initdb.d/create.sql:ro
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+
+  backend:
+    image: mobile_internet-project-backend:latest
+    build: ./CampusCompanionBackend
+    container_name: campus_backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/campus_companion?useUnicode=true&characterEncoding=utf-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 879879
+      # 生产环境下不再让 Hibernate 自动建表，由 create.sql 负责
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      # 下面这些可以按需修改为更安全的值
+      JWT_SECRET: your-secret-key
+      ZHIPU_API_KEY: 43813020086e444eba80604fa994acc9.bGStptuEuBUyNBtj
+      SPRING_MAIL_HOST: smtp.163.com
+      SPRING_MAIL_PORT: 465
+      SPRING_MAIL_USERNAME: campuscompanion@163.com
+      SPRING_MAIL_PASSWORD: TMrBnbvtMaXJb9cp
+    ports:
+      - "8080:8080"
+
+  frontend:
+    image: mobile_internet-project-frontend:latest
+    build: ./CampusCompanionWeb
+    container_name: campus_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+
+volumes:
+  db_data:
+    driver: local
