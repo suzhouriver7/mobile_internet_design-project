@@ -6,8 +6,8 @@ SET NAMES utf8mb4;
 -- DROP DATABASE 会彻底删除数据库及所有表/数据，执行前请确认！
 -- DROP DATABASE IF EXISTS campus_companion;
 
--- 指定utf8mb4字符集，兼容所有字符表情
-CREATE DATABASE campus_companion
+-- 这里使用 IF NOT EXISTS，避免在 Docker 中配合 MYSQL_DATABASE 时重复建库报错
+CREATE DATABASE IF NOT EXISTS campus_companion
     DEFAULT CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS verify_code_record
 (
     vid           BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '验证码记录唯一ID',
     email         VARCHAR(100) NOT NULL COMMENT '接受验证码的邮箱',
-    code          VARCHAR(10)  NOT NULL COMMENT '验证码',
+    code          VARCHAR(100)  NOT NULL COMMENT '验证码（存储加密后的值，长度需足够）',
     type          ENUM ('REGISTER', 'LOGIN', 'FORGET_PWD', 'BIND_PHONE', 'BIND_EMAIL') NOT NULL COMMENT '验证码用途',
     status        ENUM ('UNUSED', 'USED', 'EXPIRED') NOT NULL DEFAULT 'UNUSED' COMMENT '验证码状态',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
