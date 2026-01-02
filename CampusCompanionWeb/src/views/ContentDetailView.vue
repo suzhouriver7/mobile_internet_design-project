@@ -183,7 +183,8 @@ const commentText = ref('')
 const commentLoading = ref(false)
 const replyParentId = ref(null)
 
-const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+const fileBaseUrl =
+  import.meta.env.VITE_FILE_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 
 const resolveMediaUrl = (url) => {
   if (!url) return url

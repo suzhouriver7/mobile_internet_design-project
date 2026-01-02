@@ -2,7 +2,9 @@ import { defineStore } from 'pinia'
 import axios from '../utils/axios'
 
 // 将后端返回的头像相对路径（如 /uploads/xxx.png）转换为可在前端直接访问的完整 URL
-const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+// 开发环境默认指向本地后端，生产环境使用相对路径，走当前域名（由 Nginx 转发到后端）
+const fileBaseUrl =
+  import.meta.env.VITE_FILE_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 
 const resolveAvatarUrl = (url) => {
   if (!url) return url

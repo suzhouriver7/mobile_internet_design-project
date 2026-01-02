@@ -258,7 +258,8 @@ const getStatusType = (status) => {
 }
 
 // 与用户 store 保持一致，将后端返回的相对头像路径转换为完整 URL
-const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+const fileBaseUrl =
+  import.meta.env.VITE_FILE_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 const resolveAvatarUrl = (url) => {
   if (!url) return url
   if (/^https?:\/\//.test(url)) return url

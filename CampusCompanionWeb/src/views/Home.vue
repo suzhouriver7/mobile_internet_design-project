@@ -198,7 +198,9 @@ const currentUserId = computed(() => {
 })
 
 // 静态资源基地址，与其他页面保持一致
-const fileBaseUrl = import.meta.env.VITE_FILE_BASE_URL || 'http://localhost:8080'
+// 开发环境默认指向本地后端，生产环境使用相对路径
+const fileBaseUrl =
+  import.meta.env.VITE_FILE_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 const resolveAvatarUrl = (url) => {
   if (!url) return url
   if (/^https?:\/\//.test(url)) return url
