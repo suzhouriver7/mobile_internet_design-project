@@ -265,10 +265,14 @@ const resolveAvatarUrl = (url) => {
   return `${fileBaseUrl}${url}`
 }
 
-// 判断是否是当前用户发布的订单
+// 判断是否是当前用户发布的订单；管理员视为“拥有者”，可操作所有订单
 const isPublisher = (order) => {
-  if (!currentUserId.value || !order?.user) return false
-  return order.user.id === currentUserId.value
+  const user = authStore.user
+  if (!user || !order?.user) return false
+  // 管理员拥有所有订单的管理权限
+  if (user.userType === 1 || user.userType === 'ADMIN') return true
+  // 普通用户仅能操作自己发布的订单
+  return order.user.id === user.id
 }
 
 // 判断当前用户是否已申请过该订单
