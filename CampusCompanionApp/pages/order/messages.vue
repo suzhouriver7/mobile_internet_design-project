@@ -33,7 +33,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useStore } from 'vuex'
 import { orderApi } from '@/api/index.js'
 import { formatTime, showError } from '@/utils/util.js'
@@ -85,13 +86,14 @@ const scrollToBottom = () => {
   }, 100)
 }
 
-onMounted(() => {
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  orderId.value = currentPage.options.orderId
-  
-  if (orderId.value) {
+import { onLoad } from '@dcloudio/uni-app'
+
+onLoad((options) => {
+  if (options.orderId) {
+    orderId.value = options.orderId
     loadMessages()
+  } else {
+    showError('缺少订单ID')
   }
 })
 </script>

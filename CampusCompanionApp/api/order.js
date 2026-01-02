@@ -33,5 +33,8 @@ export default {
   },
   getOrderMessages(orderId, page = 1, size = 20) {
     return get(`/orders/${orderId}/messages`, { page, size })
+  },
+  completeOrder(orderId) {
+    return put(`/orders/${orderId}/complete`, {})
   }
 }

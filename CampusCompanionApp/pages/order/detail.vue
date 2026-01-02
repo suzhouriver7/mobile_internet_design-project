@@ -96,11 +96,24 @@
           申请加入
         </button>
         <button
-          v-if="!isOwner && hasApplied"
+          v-if="!isOwner && hasApplied && canCancelApply"
           class="action-btn"
           @click="handleCancelApply"
         >
           取消申请
+        </button>
+        <view
+          v-if="!isOwner && hasApplied && !canCancelApply"
+          class="apply-status-text"
+        >
+          <text>申请状态：{{ getApplyStatusText(myApplication.status) }}</text>
+        </view>
+        <button
+          v-if="isOwner && canCancelOrder"
+          class="action-btn cancel"
+          @click="handleCancelOrder"
+        >
+          取消订单
         </button>
         <button
           v-if="isOwner"
@@ -110,7 +123,7 @@
           查看消息
         </button>
         <button
-          v-if="isOwner"
+          v-if="isOwner && canCompleteOrder"
           class="action-btn"
           @click="handleComplete"
         >
@@ -126,7 +139,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useStore } from 'vuex'
 import { orderApi } from '@/api/index.js'
 import { formatTime, showLoading, hideLoading, showSuccess, showError } from '@/utils/util.js'
@@ -143,7 +157,7 @@ const orderId = ref(null)
 const isOwner = computed(() => {
   if (!orderDetail.value || !store.getters['user/isLogin']) return false
   const userId = store.getters['user/userId']
-  return orderDetail.value.order.user && (orderDetail.value.order.user.uid === userId || orderDetail.value.order.user.id === userId)
+  return orderDetail.value.order && orderDetail.value.order.user && (orderDetail.value.order.user.uid === userId || orderDetail.value.order.user.id === userId)
 })
 
 const hasApplied = computed(() => {
@@ -152,6 +166,34 @@ const hasApplied = computed(() => {
   return applications.value.some(app => 
     app.user && (app.user.uid === userId || app.user.id === userId)
   )
+})
+
+// 当前用户的申请状态
+const myApplication = computed(() => {
+  if (!store.getters['user/isLogin']) return null
+  const userId = store.getters['user/userId']
+  return applications.value.find(app => 
+    app.user && (app.user.uid === userId || app.user.id === userId)
+  )
+})
+
+// 是否可以取消申请（只有待审核状态可以取消）
+const canCancelApply = computed(() => {
+  const app = myApplication.value
+  return app && app.status === 'PENDING_REVIEW'
+})
+
+// 是否可以取消订单（只有待匹配或进行中状态可以取消）
+const canCancelOrder = computed(() => {
+  if (!orderDetail.value || !orderDetail.value.order) return false
+  const status = orderDetail.value.order.status
+  return status === 'PENDING' || status === 'IN_PROGRESS'
+})
+
+// 是否可以完成订单（只有进行中状态可以完成）
+const canCompleteOrder = computed(() => {
+  if (!orderDetail.value || !orderDetail.value.order) return false
+  return orderDetail.value.order.status === 'IN_PROGRESS'
 })
 
 const getActivityTypeText = (type) => {
@@ -167,6 +209,11 @@ const getApplyStatusText = (status) => {
 }
 
 const loadOrderDetail = async () => {
+  if (!orderId.value) {
+    showError('缺少订单ID')
+    return
+  }
+  
   loading.value = true
   showLoading('加载中...')
   
@@ -174,10 +221,23 @@ const loadOrderDetail = async () => {
     const detail = await orderApi.getOrderDetail(orderId.value)
     orderDetail.value = detail
     
-    // 如果是发布者，加载申请列表
-    if (isOwner.value) {
+    // 加载申请列表（所有人都可以获取，用于判断是否已申请）
+    try {
       const apps = await orderApi.getApplications(orderId.value)
       applications.value = apps || []
+      
+      // 如果是发布者，显示所有申请
+      // 如果是非发布者，只保留自己的申请用于判断状态
+      if (!isOwner.value && store.getters['user/isLogin']) {
+        const userId = store.getters['user/userId']
+        applications.value = applications.value.filter(app => 
+          app.user && (app.user.uid === userId || app.user.id === userId)
+        )
+      }
+    } catch (e) {
+      // 如果获取申请列表失败，忽略错误
+      console.error('获取申请列表失败:', e)
+      applications.value = []
     }
   } catch (error) {
     showError(error.message || '加载失败')
@@ -195,12 +255,36 @@ const handleApply = async () => {
     return
   }
   
+  // 如果已经有申请记录，提示用户
+  if (myApplication.value) {
+    const status = myApplication.value.status
+    if (status === 'APPROVED') {
+      showError('您的申请已通过，无需重复申请')
+      return
+    } else if (status === 'REJECTED') {
+      showError('您的申请已被拒绝，无法再次申请')
+      return
+    } else if (status === 'PENDING_REVIEW') {
+      showError('您已提交申请，请等待审核')
+      return
+    }
+  }
+  
   try {
     await orderApi.applyOrder(orderId.value, '')
     showSuccess('申请成功')
     loadOrderDetail()
   } catch (error) {
-    showError(error.message || '申请失败')
+    // 改进错误提示
+    let errorMsg = error.message || '申请失败'
+    if (errorMsg.includes('已申请过')) {
+      errorMsg = '您已申请过该订单，请勿重复申请'
+    } else if (errorMsg.includes('人数已满')) {
+      errorMsg = '该订单人数已满，无法申请'
+    } else if (errorMsg.includes('已完成') || errorMsg.includes('已取消') || errorMsg.includes('已过期')) {
+      errorMsg = '该订单状态不允许申请'
+    }
+    showError(errorMsg)
   }
 }
 
@@ -224,6 +308,29 @@ const handleAudit = async (applyId, status) => {
   }
 }
 
+const handleCancelOrder = async () => {
+  uni.showModal({
+    title: '确认取消',
+    content: '确定要取消这个订单吗？此操作不可撤销。',
+    success: async (res) => {
+      if (res.confirm) {
+        try {
+          showLoading('取消中...')
+          await orderApi.deleteOrder(orderId.value)
+          showSuccess('订单已取消')
+          hideLoading()
+          setTimeout(() => {
+            uni.navigateBack()
+          }, 1000)
+        } catch (error) {
+          hideLoading()
+          showError(error.message || '取消失败')
+        }
+      }
+    }
+  })
+}
+
 const handleComplete = async () => {
   try {
     await orderApi.completeOrder(orderId.value)
@@ -240,13 +347,13 @@ const toMessages = () => {
   })
 }
 
-onMounted(() => {
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  orderId.value = currentPage.options.id
-  
-  if (orderId.value) {
+// uni-app 中页面参数通过 onLoad 获取
+onLoad((options) => {
+  if (options.id) {
+    orderId.value = options.id
     loadOrderDetail()
+  } else {
+    showError('缺少订单ID')
   }
 })
 </script>
@@ -366,6 +473,11 @@ onMounted(() => {
   color: #ffffff;
 }
 
+.action-btn.cancel {
+  background: #ff9500;
+  color: #ffffff;
+}
+
 .action-bar {
   position: fixed;
   bottom: 0;
@@ -397,6 +509,15 @@ onMounted(() => {
 .loading-text {
   font-size: 28rpx;
   color: #999999;
+}
+
+.apply-status-text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #666666;
 }
 </style>
 

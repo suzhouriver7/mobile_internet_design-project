@@ -26,7 +26,22 @@ export function request(options) {
             reject(new Error(response.message || '请求失败'))
           }
         } else {
-          reject(new Error(`请求失败: ${res.statusCode}`))
+          // 尝试解析响应体中的错误信息
+          let errorMessage = `请求失败: ${res.statusCode}`
+          try {
+            if (res.data && typeof res.data === 'object') {
+              if (res.data.message) {
+                errorMessage = res.data.message
+              } else if (res.data.error) {
+                errorMessage = res.data.error
+              }
+            } else if (typeof res.data === 'string') {
+              errorMessage = res.data
+            }
+          } catch (e) {
+            // 解析失败，使用默认错误信息
+          }
+          reject(new Error(errorMessage))
         }
       },
       fail: (err) => {

@@ -10,7 +10,7 @@
         <input
           v-model="form.identifier"
           class="input"
-          placeholder="请输入邮箱或学号"
+          placeholder="请输入邮箱"
           type="text"
         />
       </view>
@@ -64,8 +64,14 @@ const handleLogin = async () => {
   showLoading('登录中...')
   
   try {
-    const response = await authApi.login(form.value)
-    await store.dispatch('user/login', response)
+    // 确保传递的是普通对象，而不是响应式对象
+    const loginData = {
+      identifier: form.value.identifier.trim(),
+      password: form.value.password
+    }
+    
+    // 直接调用 store 的 login action，它会处理登录和状态保存
+    await store.dispatch('user/login', loginData)
     showSuccess('登录成功')
     
     // 跳转到首页

@@ -91,7 +91,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useStore } from 'vuex'
 import { contentApi } from '@/api/index.js'
 import { formatRelativeTime, showLoading, hideLoading, showSuccess, showError } from '@/utils/util.js'
@@ -107,6 +108,11 @@ const commentText = ref('')
 const contentId = ref(null)
 
 const loadContentDetail = async () => {
+  if (!contentId.value) {
+    showError('缺少内容ID')
+    return
+  }
+  
   loading.value = true
   showLoading('加载中...')
   
@@ -176,13 +182,13 @@ const previewImage = (current, urls) => {
   })
 }
 
-onMounted(() => {
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  contentId.value = currentPage.options.id
-  
-  if (contentId.value) {
+// uni-app 中页面参数通过 onLoad 获取
+onLoad((options) => {
+  if (options.id) {
+    contentId.value = options.id
     loadContentDetail()
+  } else {
+    showError('缺少内容ID')
   }
 })
 </script>
