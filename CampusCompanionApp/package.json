@@ -1,0 +1,22 @@
+{
+  "name": "campus-companion-app",
+  "version": "1.0.0",
+  "description": "校园约伴系统 uni-app 移动端",
+  "main": "main.js",
+  "scripts": {
+    "dev:h5": "uni",
+    "build:h5": "uni build",
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "dev:app": "uni -p app",
+    "build:app": "uni build -p app"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.19",
+    "vue": "^3.5.26",
+    "vuex": "^4.1.0"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.3.2"
+  }
+}
