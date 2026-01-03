@@ -39,7 +39,7 @@
         <text class="more" @click="toOrderList">更多 ></text>
       </view>
       <view v-if="orders.length > 0" class="order-list">
-        <view v-for="order in orders" :key="order.oid" class="order-item" @click="toOrderDetail(order.oid)">
+        <view v-for="order in orders" :key="order.id" class="order-item" @click="toOrderDetail(order.id)">
           <view class="order-header">
             <text class="order-type">{{ getActivityType(order.activityType) }}</text>
             <text class="order-status">{{ getStatus(order.status) }}</text>

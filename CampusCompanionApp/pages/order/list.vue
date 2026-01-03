@@ -17,14 +17,14 @@
       <view v-if="orderList.length > 0" class="list-box">
         <view v-for="order in orderList" :key="order.oid || order.id" class="item-box" @click="goDetail(order.oid || order.id)">
           <view class="item-header">
-            <text class="item-title">{{ order.activityType || '活动' }}</text>
-            <text class="item-status">{{ order.status || '进行中' }}</text>
+            <text class="item-title">{{ getActivityTypeText(order.activityType) }}</text>
+            <text class="item-status">{{ getStatusText(order.status) }}</text>
           </view>
           <text class="item-location">📍 {{ order.location || '未设置' }}</text>
-          <text class="item-time">⏰ {{ order.startTime || '未设置' }}</text>
+          <text class="item-time">⏰ {{ formatTime(order.startTime) }}</text>
           <view class="item-footer">
             <text class="item-people">{{ order.currentPeople || 0 }}/{{ order.maxPeople || 0 }}人</text>
-            <text class="item-campus">{{ order.campus || '未设置' }}</text>
+            <text class="item-campus">{{ getCampusText(order.campus) }}</text>
           </view>
         </view>
       </view>
@@ -44,6 +44,7 @@
 
 <script>
 import { orderApi } from '@/api/index.js'
+import { ACTIVITY_TYPE, ACTIVITY_TYPE_MAP, CAMPUS, CAMPUS_MAP, ORDER_STATUS_MAP } from '@/utils/constants.js'
 
 export default {
   data() {
@@ -58,15 +59,22 @@ export default {
       selectedCampus: null,
       typeOptions: [
         { value: null, label: '全部' },
-        { value: 1, label: '篮球' },
-        { value: 2, label: '羽毛球' },
-        { value: 3, label: '聚餐' },
-        { value: 4, label: '学习' }
+        { value: ACTIVITY_TYPE.BASKETBALL, label: ACTIVITY_TYPE_MAP.BASKETBALL },
+        { value: ACTIVITY_TYPE.BADMINTON, label: ACTIVITY_TYPE_MAP.BADMINTON },
+        { value: ACTIVITY_TYPE.MEAL, label: ACTIVITY_TYPE_MAP.MEAL },
+        { value: ACTIVITY_TYPE.STUDY, label: ACTIVITY_TYPE_MAP.STUDY },
+        { value: ACTIVITY_TYPE.MOVIE, label: ACTIVITY_TYPE_MAP.MOVIE },
+        { value: ACTIVITY_TYPE.RUNNING, label: ACTIVITY_TYPE_MAP.RUNNING },
+        { value: ACTIVITY_TYPE.GAME, label: ACTIVITY_TYPE_MAP.GAME },
+        { value: ACTIVITY_TYPE.OTHER, label: ACTIVITY_TYPE_MAP.OTHER }
       ],
       campusOptions: [
         { value: null, label: '全部' },
-        { value: 1, label: '主校区' },
-        { value: 2, label: '分校区' }
+        { value: CAMPUS.LIANGXIANG, label: CAMPUS_MAP.LIANGXIANG },
+        { value: CAMPUS.ZHONGGUANCUN, label: CAMPUS_MAP.ZHONGGUANCUN },
+        { value: CAMPUS.ZHUHAI, label: CAMPUS_MAP.ZHUHAI },
+        { value: CAMPUS.XISHAN, label: CAMPUS_MAP.XISHAN },
+        { value: CAMPUS.OTHER_CAMPUS, label: CAMPUS_MAP.OTHER_CAMPUS }
       ]
     }
   },
@@ -83,11 +91,27 @@ export default {
   methods: {
     async loadOrders() {
       if (this.loading) return
-      if (!this.hasMore) return
+      if (!this.hasMore && this.page > 1) return
       
       this.loading = true
       try {
-        const result = await orderApi.getOrders({ page: this.page, size: this.size })
+        // 构建请求参数，包含筛选条件
+        const params = {
+          page: this.page,
+          size: this.size
+        }
+        
+        // 添加活动类型筛选
+        if (this.selectedType && this.selectedType.value) {
+          params.activityType = this.selectedType.value
+        }
+        
+        // 添加校区筛选
+        if (this.selectedCampus && this.selectedCampus.value) {
+          params.campus = this.selectedCampus.value
+        }
+        
+        const result = await orderApi.getOrders(params)
         if (result && result.list) {
           if (this.page === 1) {
             this.orderList = result.list
@@ -96,9 +120,15 @@ export default {
           }
           this.hasMore = result.list.length >= this.size
           this.page++
+        } else {
+          this.hasMore = false
         }
       } catch (e) {
         console.error('加载活动失败:', e)
+        uni.showToast({
+          title: '加载失败',
+          icon: 'none'
+        })
       } finally {
         this.loading = false
         this.refreshing = false
@@ -131,6 +161,29 @@ export default {
     },
     goCreate() {
       uni.navigateTo({ url: '/pages/order/create' })
+    },
+    getActivityTypeText(type) {
+      return ACTIVITY_TYPE_MAP[type] || '其他'
+    },
+    getCampusText(campus) {
+      return CAMPUS_MAP[campus] || '其他'
+    },
+    getStatusText(status) {
+      return ORDER_STATUS_MAP[status] || '未知'
+    },
+    formatTime(timeStr) {
+      if (!timeStr) return '未设置'
+      // 格式化时间显示，例如：2024-01-01 12:00:00 -> 01-01 12:00
+      try {
+        const date = new Date(timeStr)
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${month}-${day} ${hours}:${minutes}`
+      } catch (e) {
+        return timeStr
+      }
     }
   }
 }

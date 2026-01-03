@@ -41,7 +41,9 @@ const actions = {
     try {
       const response = await authApi.login(loginData)
       if (response && response.userInfo) {
-        commit('SET_USER_ID', response.userInfo.uid)
+        // 后端返回的 userInfo.id 是用户ID
+        const userId = response.userInfo.id || response.userInfo.uid
+        commit('SET_USER_ID', userId)
         commit('SET_USER_INFO', response.userInfo)
         commit('SET_LOGIN_STATUS', true)
         return response
