@@ -63,5 +63,6 @@ export const ORDER_STATUS_MAP = {
 export const APPLY_STATUS_MAP = {
   PENDING_REVIEW: '待审核',
   APPROVED: '已通过',
-  REJECTED: '已拒绝'
+  REJECTED: '已拒绝',
+  CANCELLED_APPLY: '已取消申请'
 }

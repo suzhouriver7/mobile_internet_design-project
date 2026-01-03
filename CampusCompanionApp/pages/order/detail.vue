@@ -1,30 +1,30 @@
 <template>
   <view class="order-detail-container">
-    <view v-if="orderDetail" class="detail-content">
+    <view v-if="orderDetail && orderDetail.order" class="detail-content">
       <!-- 订单信息 -->
       <view class="info-section">
         <view class="section-title">活动信息</view>
         <view class="info-item">
           <text class="info-label">活动类型：</text>
-          <text class="info-value">{{ getActivityTypeText(orderDetail.order.activityType) }}</text>
+          <text class="info-value">{{ getActivityTypeText(orderDetail.order?.activityType) }}</text>
         </view>
         <view class="info-item">
           <text class="info-label">活动地点：</text>
-          <text class="info-value">{{ orderDetail.order.location }}</text>
+          <text class="info-value">{{ orderDetail.order?.location || '未设置' }}</text>
         </view>
         <view class="info-item">
           <text class="info-label">开始时间：</text>
-          <text class="info-value">{{ formatTime(orderDetail.order.startTime) }}</text>
+          <text class="info-value">{{ formatTime(orderDetail.order?.startTime) }}</text>
         </view>
         <view class="info-item">
           <text class="info-label">校区：</text>
-          <text class="info-value">{{ getCampusText(orderDetail.order.campus) }}</text>
+          <text class="info-value">{{ getCampusText(orderDetail.order?.campus) }}</text>
         </view>
         <view class="info-item">
           <text class="info-label">人数：</text>
-          <text class="info-value">{{ orderDetail.order.currentPeople }}/{{ orderDetail.order.maxPeople }}人</text>
+          <text class="info-value">{{ orderDetail.order?.currentPeople || 0 }}/{{ orderDetail.order?.maxPeople || 0 }}人</text>
         </view>
-        <view v-if="orderDetail.order.note" class="info-item">
+        <view v-if="orderDetail.order?.note" class="info-item">
           <text class="info-label">备注：</text>
           <text class="info-value">{{ orderDetail.order.note }}</text>
         </view>
@@ -35,12 +35,12 @@
         <view class="section-title">发布者</view>
         <view class="user-info">
           <image
-            v-if="orderDetail.order.user && orderDetail.order.user.avatarUrl"
+            v-if="orderDetail.order?.user && orderDetail.order.user.avatarUrl"
             :src="orderDetail.order.user.avatarUrl"
             class="user-avatar"
             mode="aspectFill"
           />
-          <text class="user-nickname">{{ orderDetail.order.user ? orderDetail.order.user.nickname : '匿名' }}</text>
+          <text class="user-nickname">{{ orderDetail.order?.user ? orderDetail.order.user.nickname : '匿名' }}</text>
         </view>
       </view>
       
@@ -103,7 +103,7 @@
           取消申请
         </button>
         <view
-          v-if="!isOwner && hasApplied && !canCancelApply"
+          v-if="!isOwner && hasApplied && showApplyStatus"
           class="apply-status-text"
         >
           <text>申请状态：{{ getApplyStatusText(myApplication.status) }}</text>
@@ -183,6 +183,12 @@ const canCancelApply = computed(() => {
   return app && app.status === 'PENDING_REVIEW'
 })
 
+// 是否显示申请状态（已申请但不可取消）
+const showApplyStatus = computed(() => {
+  const app = myApplication.value
+  return app && app.status !== 'PENDING_REVIEW' && app.status !== 'CANCELLED_APPLY'
+})
+
 // 是否可以取消订单（只有待匹配或进行中状态可以取消）
 const canCancelOrder = computed(() => {
   if (!orderDetail.value || !orderDetail.value.order) return false
@@ -219,6 +225,13 @@ const loadOrderDetail = async () => {
   
   try {
     const detail = await orderApi.getOrderDetail(orderId.value)
+    
+    // 确保数据结构正确
+    if (!detail || !detail.order) {
+      showError('订单数据格式错误')
+      return
+    }
+    
     orderDetail.value = detail
     
     // 加载申请列表（所有人都可以获取，用于判断是否已申请）
@@ -226,8 +239,8 @@ const loadOrderDetail = async () => {
       const apps = await orderApi.getApplications(orderId.value)
       applications.value = apps || []
       
-      // 如果是发布者，显示所有申请
-      // 如果是非发布者，只保留自己的申请用于判断状态
+      // 如果是发布者，显示所有申请（包括已取消的）
+      // 如果是非发布者，只保留自己的申请用于判断状态（包括已取消的）
       if (!isOwner.value && store.getters['user/isLogin']) {
         const userId = store.getters['user/userId']
         applications.value = applications.value.filter(app => 
@@ -240,6 +253,7 @@ const loadOrderDetail = async () => {
       applications.value = []
     }
   } catch (error) {
+    console.error('加载订单详情失败:', error)
     showError(error.message || '加载失败')
   } finally {
     loading.value = false

@@ -41,7 +41,7 @@
       
       <view class="form-item">
         <text class="label">开始时间 *</text>
-        <picker mode="date" :value="dateValue" @change="onDateChange">
+        <picker mode="date" :value="dateValue" :start="minDate" @change="onDateChange">
           <view class="picker-view">
             <text>{{ dateValue || '请选择日期' }}</text>
           </view>
@@ -70,12 +70,23 @@
 
 <script setup>
 import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useStore } from 'vuex'
 import { orderApi } from '@/api/index.js'
 import { showLoading, hideLoading, showSuccess, showError } from '@/utils/util.js'
 import { ACTIVITY_TYPE, ACTIVITY_TYPE_MAP, GENDER_REQUIRE, GENDER_REQUIRE_MAP, CAMPUS, CAMPUS_MAP } from '@/utils/constants.js'
 
 const store = useStore()
+
+// 检查登录状态 - 使用 onLoad 页面生命周期
+onLoad(() => {
+  if (!store.getters['user/isLogin']) {
+    showError('请先登录')
+    setTimeout(() => {
+      uni.redirectTo({ url: '/pages/auth/login' })
+    }, 1000)
+  }
+})
 
 const form = ref({
   activityType: null,
@@ -90,6 +101,17 @@ const form = ref({
 const dateValue = ref('')
 const timeValue = ref('')
 const loading = ref(false)
+
+// 获取最小日期（今天）
+const getMinDate = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const minDate = ref(getMinDate())
 
 const activityTypeOptions = Object.keys(ACTIVITY_TYPE).map(key => ({
   value: ACTIVITY_TYPE[key],
@@ -147,6 +169,15 @@ const updateStartTime = () => {
 }
 
 const handleSubmit = async () => {
+  // 检查登录状态
+  if (!store.getters['user/isLogin']) {
+    showError('请先登录')
+    setTimeout(() => {
+      uni.redirectTo({ url: '/pages/auth/login' })
+    }, 1000)
+    return
+  }
+  
   // 验证必填项
   if (!form.value.activityType || !form.value.genderRequire || !form.value.campus ||
       !form.value.location || !form.value.startTime || !form.value.maxPeople) {
@@ -157,6 +188,17 @@ const handleSubmit = async () => {
   if (form.value.maxPeople < 2 || form.value.maxPeople > 20) {
     showError('人数上限应在2-20之间')
     return
+  }
+  
+  // 验证开始时间必须大于当前时间
+  if (form.value.startTime) {
+    const startTime = new Date(form.value.startTime)
+    const now = new Date()
+    
+    if (startTime <= now) {
+      showError('开始时间必须大于当前时间')
+      return
+    }
   }
   
   loading.value = true

@@ -86,8 +86,6 @@ const scrollToBottom = () => {
   }, 100)
 }
 
-import { onLoad } from '@dcloudio/uni-app'
-
 onLoad((options) => {
   if (options.orderId) {
     orderId.value = options.orderId

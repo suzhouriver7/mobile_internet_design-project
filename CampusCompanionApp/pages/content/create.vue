@@ -26,11 +26,22 @@
 
 <script setup>
 import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { useStore } from 'vuex'
 import { contentApi, fileApi } from '@/api/index.js'
 import { showLoading, hideLoading, showSuccess, showError } from '@/utils/util.js'
 
 const store = useStore()
+
+// 检查登录状态 - 使用 onLoad 页面生命周期
+onLoad(() => {
+  if (!store.getters['user/isLogin']) {
+    showError('请先登录')
+    setTimeout(() => {
+      uni.redirectTo({ url: '/pages/auth/login' })
+    }, 1000)
+  }
+})
 
 const form = ref({
   content: '',
@@ -65,6 +76,15 @@ const removeMedia = () => {
 }
 
 const handleSubmit = async () => {
+  // 检查登录状态
+  if (!store.getters['user/isLogin']) {
+    showError('请先登录')
+    setTimeout(() => {
+      uni.redirectTo({ url: '/pages/auth/login' })
+    }, 1000)
+    return
+  }
+  
   if (!form.value.content.trim()) {
     showError('请输入动态内容')
     return
