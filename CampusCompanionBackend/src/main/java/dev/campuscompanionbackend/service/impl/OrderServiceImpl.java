@@ -103,6 +103,8 @@ public class OrderServiceImpl implements OrderService {
         if (status == null && activityType == null && campus == null) {
             Page<Order> orderPage = orderRepository.findAll(pageable);
 
+            orderPage.getContent().forEach(this::checkOrder);
+
             List<Map<String, Object>> orderList = orderPage.getContent().stream()
                     .map(this::convertToOrderVO)
                     .collect(Collectors.toList());
@@ -128,6 +130,7 @@ public class OrderServiceImpl implements OrderService {
             baseList = orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
         }
 
+        baseList.forEach(this::checkOrder);
         List<Order> filtered = baseList.stream()
                 .filter(o -> status == null || o.getStatus() == status)
                 .filter(o -> activityType == null || o.getActivityType() == activityType)
@@ -159,6 +162,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public Object getOrderDetail(Long orderId) {
         log.info("获取订单详情: orderId={}", orderId);
 
@@ -323,6 +327,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public Object getApplications(Long orderId) {
         log.info("获取申请列表: orderId={}", orderId);
 
@@ -408,6 +413,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
     public Object getOrderMessages(Long orderId, Integer page, Integer size) {
         log.info("获取订单消息: orderId={}, page={}, size={}", orderId, page, size);
 
@@ -434,12 +440,14 @@ public class OrderServiceImpl implements OrderService {
         );
     }
 
-    private Order getOrderById(Long orderId) {
-        return orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotExistException("订单不存在"));
+    @Transactional
+    protected Order getOrderById(Long orderId) {
+        return checkOrder(orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotExistException("订单不存在")));
     }
 
-    private User getUserById(Long userId) {
+    @Transactional
+    protected User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotExistException("用户不存在"));
     }
@@ -505,5 +513,35 @@ public class OrderServiceImpl implements OrderService {
         messageVO.put("createdAt", message.getCreatedAt());
 
         return messageVO;
+    }
+
+    @Transactional
+    protected Order checkOrder(Order order) {
+        if(order == null || order.getStatus() == OrderStatus.CANCELLED)
+            return order;
+
+        boolean isFull = false;
+        boolean isExpired = false;
+        OrderStatus expectedStatus;
+        if(order.getCurrentPeople().equals(order.getMaxPeople())){
+            isFull = true;
+        }
+        if(order.getStartTime().isBefore(LocalDateTime.now())){
+            isExpired = true;
+        }
+        if(!isFull && !isExpired){
+            expectedStatus = OrderStatus.PENDING;
+        }else if(isFull && isExpired){
+            expectedStatus = OrderStatus.COMPLETED;
+        }else if(isExpired){
+            expectedStatus = OrderStatus.EXPIRED;
+        }else{
+            expectedStatus = OrderStatus.IN_PROGRESS;
+        }
+        if(expectedStatus != order.getStatus()){
+            order.setStatus(expectedStatus);
+            orderRepository.save(order);
+        }
+        return order;
     }
 }
