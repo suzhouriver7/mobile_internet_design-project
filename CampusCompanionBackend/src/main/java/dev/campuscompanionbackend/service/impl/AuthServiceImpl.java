@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -81,6 +80,8 @@ public class AuthServiceImpl implements AuthService {
                 ).orElseThrow(() -> new RegisterFailedException("用户未请求验证码: email=" + email));
 
         if (record.getExpiredAt().isBefore(LocalDateTime.now())) {
+            record.setStatus(VerifyCodeRecordStatus.EXPIRED);
+            verifyCodeRecordRepository.save(record);
             throw new RegisterFailedException("验证码已过期: email=" + email);
         }
 
@@ -159,6 +160,8 @@ public class AuthServiceImpl implements AuthService {
                 new SomethingHappenedException("邮箱未验证: email=" + email)
         );
         if(record.getExpiredAt().isBefore(LocalDateTime.now())){
+            record.setStatus(VerifyCodeRecordStatus.EXPIRED);
+            verifyCodeRecordRepository.save(record);
             throw new RegisterFailedException("验证码已过期: email=" + email);
         }
         if(!passwordEncoder.matches(code, record.getCode())) {
