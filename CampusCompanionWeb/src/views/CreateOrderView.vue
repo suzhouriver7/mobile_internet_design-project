@@ -69,6 +69,9 @@
             :disabled-date="disabledDate"
             :disabled-time="disabledTime"
           />
+          <div class="time-hint">
+            开始时间必须晚于当前时间；时间选择器中三列分别为：小时、分钟、秒（24 小时制）。
+          </div>
         </el-form-item>
 
         <el-form-item label="人数上限" prop="maxPeople">
@@ -210,7 +213,7 @@ const showMatchingHint = computed(() => {
   )
 })
 
-// 禁止选择早于当前时间的日期/时间
+// 禁止选择早于当前时间的日期
 const disabledDate = (time) => {
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
@@ -288,6 +291,16 @@ const handleSubmit = () => {
   if (!formRef.value) return
   formRef.value.validate(async (valid) => {
     if (!valid) return
+    // 额外校验：开始时间必须晚于当前时间（精确到秒）
+    if (form.startTime) {
+      const now = new Date()
+      // 将 "YYYY-MM-DD HH:mm:ss" 转为 ISO 格式，避免浏览器解析差异
+      const selected = new Date(form.startTime.replace(' ', 'T'))
+      if (!Number.isNaN(selected.getTime()) && selected.getTime() <= now.getTime()) {
+        ElMessage.error('开始时间必须晚于当前时间')
+        return
+      }
+    }
     submitting.value = true
     try {
       // 直接按 CreateOrderRequest 结构提交

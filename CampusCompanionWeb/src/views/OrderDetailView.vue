@@ -46,6 +46,7 @@
                 </div>
                 <div class="publisher-extra" v-if="publisher">
                   <span>用户ID：{{ publisher.id }}</span>
+                  <span v-if="publisherEmail">邮箱：{{ publisherEmail }}</span>
                 </div>
                 <div class="publisher-extra" v-if="order">
                   <span>订单ID：{{ order.id }}</span>
@@ -358,6 +359,12 @@
                       </el-button>
                     </div>
                   </div>
+                  <div
+                    v-if="apply.status === 'APPROVED' && getApplicantEmail(apply.user?.id)"
+                    class="apply-email"
+                  >
+                    邮箱：{{ getApplicantEmail(apply.user.id) }}
+                  </div>
                   <div class="apply-time">
                     申请时间：{{ formatDateTime(apply.createdAt, false) }}
                   </div>
@@ -381,6 +388,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { useOrderStore } from '../stores/order'
 import { useAuthStore } from '../stores/auth'
+import api from '../utils/axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -466,6 +474,10 @@ const publisherAvatarUrl = computed(() => {
   return resolveAvatarUrl(publisher.value.avatarUrl)
 })
 
+// 发布者邮箱与申请人邮箱（按用户ID缓存）
+const publisherEmail = ref('')
+const applicantEmails = ref({})
+
 // 编辑状态与表单
 const isEditing = ref(false)
 const savingEdit = ref(false)
@@ -508,6 +520,11 @@ const getStatusLabel = (status) => statusMap[status] || '未知'
 const getStatusType = (status) => statusTypeMap[status] || 'info'
 const getGenderLabel = (gender) => genderMap[gender] || '不限'
 const getApplyStatusLabel = (status) => applyStatusMap[status] || '待审核'
+
+const getApplicantEmail = (userId) => {
+  if (!userId) return ''
+  return applicantEmails.value[userId] || ''
+}
 
 const formatDateTime = (value, withSeconds = false) => {
   if (!value) return ''
@@ -834,6 +851,49 @@ const normalizeDetail = () => {
   }
 }
 
+// 基于用户ID从后端获取邮箱，并做简单缓存
+const fetchUserEmailById = async (userId) => {
+  if (!userId) return ''
+  const cached = applicantEmails.value[userId]
+  if (cached) return cached
+  try {
+    const resp = await api.get(`/users/${userId}`)
+    const email = resp.data?.data?.email || ''
+    if (email) {
+      applicantEmails.value[userId] = email
+    }
+    return email
+  } catch (e) {
+    console.error('加载用户邮箱失败', userId, e)
+    return ''
+  }
+}
+
+// 加载发布者与已通过申请者的邮箱
+const loadRelatedUserEmails = async () => {
+  try {
+    if (publisher.value?.id) {
+      const email = await fetchUserEmailById(publisher.value.id)
+      if (email) {
+        publisherEmail.value = email
+      }
+    }
+
+    if (Array.isArray(applications.value) && applications.value.length > 0) {
+      const approvedIds = Array.from(
+        new Set(
+          applications.value
+            .filter(a => a.status === 'APPROVED' && a.user?.id)
+            .map(a => a.user.id)
+        )
+      )
+      await Promise.all(approvedIds.map(id => fetchUserEmailById(id)))
+    }
+  } catch (e) {
+    console.error('批量加载关联用户邮箱失败', e)
+  }
+}
+
 const loadDetail = async () => {
   const id = route.params.id
   if (!id) return
@@ -841,6 +901,7 @@ const loadDetail = async () => {
     loading.value = true
     await orderStore.getOrderDetail(id)
     normalizeDetail()
+    await loadRelatedUserEmails()
   } catch (error) {
     console.error('加载订单详情失败', error)
     ElMessage.error(error?.message || '加载订单详情失败')
@@ -1248,6 +1309,12 @@ onMounted(() => {
   margin-top: 2px;
   font-size: 12px;
   color: #909399;
+}
+
+.apply-email {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #606266;
 }
 
 @media (max-width: 768px) {
