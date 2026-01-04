@@ -60,7 +60,9 @@ const handleLogin = async () => {
     const redirect = router.currentRoute.value.query.redirect || '/'
     await router.push(redirect)
   } catch (error) {
-    ElMessage.error(error.message || '登录失败')
+    const backendMsg = error?.response?.data?.message
+    const storeMsg = authStore.error
+    ElMessage.error(storeMsg || backendMsg || error.message || '登录失败')
   }
 }
 </script>
